@@ -13,7 +13,7 @@ use crypto::hw_rpc_task::HwRpcTaskAwaitingStatus;
 use crypto::trezor::trezor_rpc_task::{TrezorRequestStatuses, TrezorRpcTaskProcessor};
 use crypto::trezor::{TrezorError, TrezorProcessingError};
 use crypto::{from_hw_error, CryptoCtx, CryptoCtxError, DerivationPath, HwError, HwProcessingError, HwRpcError};
-use keys::{AddressFormat, AddressHashEnum, KeyPair, Private, Public as PublicKey};
+use keys::{AddressFormat, KeyPair, Private, Public as PublicKey};
 use mm2_core::mm_ctx::MmArc;
 use mm2_err_handle::prelude::*;
 use rpc::v1::types::ToTxHash;
@@ -469,12 +469,11 @@ where
                     .clone();
                 let my_address = AddressBuilder::new(
                     addr_format,
-                    AddressHashEnum::AddressHash(key_pair.public().address_hash()),
                     coin.as_ref().conf.checksum_type,
                     coin.as_ref().conf.address_prefixes.clone(),
                     coin.as_ref().conf.bech32_hrp.clone(),
                 )
-                .as_pkh()
+                .as_pkh_from_pk(key_pair.public())
                 .build()
                 .map_to_mm(WithdrawError::InternalError)?;
                 (key_pair, my_address)

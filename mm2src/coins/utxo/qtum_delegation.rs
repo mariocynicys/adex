@@ -186,7 +186,7 @@ impl QtumCoin {
                         .map(|padded_staker_address_hex| padded_staker_address_hex.trim_start_matches('0'))
                 }) {
                 let hash = H160::from_str(raw).map_to_mm(|e| StakingInfosError::Internal(e.to_string()))?;
-                let address = self.utxo_address_from_contract_addr(hash);
+                let address = self.utxo_addr_from_contract_addr(hash);
                 Ok(Some(address.to_string()))
             } else {
                 Ok(None)

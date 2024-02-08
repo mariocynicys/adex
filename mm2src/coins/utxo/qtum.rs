@@ -149,12 +149,11 @@ pub trait QtumBasedCoin: UtxoCommonOps + MarketCoinOps {
         let utxo = self.as_ref();
         AddressBuilder::new(
             self.addr_format().clone(),
-            AddressHashEnum::AddressHash(address.0.into()),
             utxo.conf.checksum_type,
             utxo.conf.address_prefixes.clone(),
             utxo.conf.bech32_hrp.clone(),
         )
-        .as_pkh()
+        .as_pkh(AddressHashEnum::AddressHash(address.0.into()))
         .build()
         .expect("valid address props")
     }
@@ -162,20 +161,6 @@ pub trait QtumBasedCoin: UtxoCommonOps + MarketCoinOps {
     fn my_addr_as_contract_addr(&self) -> MmResult<H160, Qrc20AddressError> {
         let my_address = self.as_ref().derivation_method.single_addr_or_err()?.clone();
         contract_addr_from_utxo_addr(my_address).mm_err(Qrc20AddressError::from)
-    }
-
-    fn utxo_address_from_contract_addr(&self, address: H160) -> Address {
-        let utxo = self.as_ref();
-        AddressBuilder::new(
-            self.addr_format().clone(),
-            AddressHashEnum::AddressHash(address.0.into()),
-            utxo.conf.checksum_type,
-            utxo.conf.address_prefixes.clone(),
-            utxo.conf.bech32_hrp.clone(),
-        )
-        .as_pkh()
-        .build()
-        .expect("valid address props")
     }
 
     fn contract_address_from_raw_pubkey(&self, pubkey: &[u8]) -> Result<H160, String> {

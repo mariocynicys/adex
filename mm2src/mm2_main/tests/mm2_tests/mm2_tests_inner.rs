@@ -257,6 +257,80 @@ fn test_my_balance() {
 }
 
 #[test]
+fn test_p2pk_my_balance() {
+    // PK of the P2PK balance: 03f8f8fa2062590ba9a0a7a86f937de22f540c015864aad35a2a9f6766de906265
+    let seed = "salmon angle cushion sauce accuse earth volume until zone youth emerge favorite";
+
+    let coins = json! ([
+        {
+            "coin": "tBTC",
+            "name": "tbitcoin",
+            "fname": "tBitcoin",
+            "rpcport": 18332,
+            "pubtype": 111,
+            "p2shtype": 196,
+            "wiftype": 239,
+            "txfee": 0,
+            "estimate_fee_mode": "ECONOMICAL",
+            "mm2": 1,
+            "required_confirmations": 0,
+            "protocol": {
+                "type": "UTXO"
+            },
+        }
+    ]);
+
+    let mm = MarketMakerIt::start(
+        json! ({
+            "gui": "nogui",
+            "netid": 9998,
+            "myipaddr": env::var("BOB_TRADE_IP").ok(),
+            "rpcip": env::var("BOB_TRADE_IP").ok(),
+            "passphrase": seed.to_string(),
+            "coins": coins,
+            "i_am_seed": true,
+            "rpc_password": "pass",
+        }),
+        "pass".into(),
+        None,
+    )
+    .unwrap();
+    let (_dump_log, _dump_dashboard) = mm.mm_dump();
+    log!("log path: {}", mm.log_path.display());
+
+    let electrum = block_on(mm.rpc(&json!({
+        "userpass": mm.userpass,
+        "method": "electrum",
+        "coin": "tBTC",
+        "servers": [{"url":"electrum1.cipig.net:10068"},{"url":"electrum2.cipig.net:10068"},{"url":"electrum3.cipig.net:10068"}],
+        "mm2": 1,
+    }))).unwrap();
+    assert_eq!(
+        electrum.0,
+        StatusCode::OK,
+        "RPC «electrum» failed with {} {}",
+        electrum.0,
+        electrum.1
+    );
+
+    let my_balance = block_on(mm.rpc(&json! ({
+        "userpass": mm.userpass,
+        "method": "my_balance",
+        "coin": "tBTC",
+    })))
+    .unwrap();
+
+    let json: Json = json::from_str(&my_balance.1).unwrap();
+    let my_balance: &str = json["balance"].as_str().unwrap();
+    assert_eq!(my_balance, "0.00076");
+    let my_unspendable_balance = json["unspendable_balance"].as_str().unwrap();
+    assert_eq!(my_unspendable_balance, "0");
+    let my_address = json["address"].as_str().unwrap();
+    // Even though the address is a P2PK, it's formatted as P2PKH like most explorers do.
+    assert_eq!(my_address, "mgrM9w49Q7vqtroLKGekLTqCVFye5u6G3v");
+}
+
+#[test]
 #[cfg(not(target_arch = "wasm32"))]
 fn test_p2wpkh_my_balance() {
     let seed = "valley embody about obey never adapt gesture trust screen tube glide bread";

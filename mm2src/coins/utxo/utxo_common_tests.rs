@@ -81,16 +81,10 @@ pub(super) fn utxo_coin_fields_for_test(
     } else {
         UtxoAddressFormat::Standard
     };
-    let my_address = AddressBuilder::new(
-        addr_format,
-        key_pair.public().address_hash().into(),
-        checksum_type,
-        prefixes,
-        hrp,
-    )
-    .as_pkh()
-    .build()
-    .expect("valid address props");
+    let my_address = AddressBuilder::new(addr_format, checksum_type, prefixes, hrp)
+        .as_pkh_from_pk(key_pair.public())
+        .build()
+        .expect("valid address props");
     let my_script_pubkey = Builder::build_p2pkh(my_address.hash()).to_bytes();
 
     let priv_key_policy = PrivKeyPolicy::Iguana(key_pair);

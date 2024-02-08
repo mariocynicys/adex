@@ -251,15 +251,13 @@ impl BchDockerOps {
 
         for _ in 0..18 {
             let key_pair = KeyPair::random_compressed();
-            let address_hash = key_pair.public().address_hash();
             let address = AddressBuilder::new(
                 Default::default(),
-                address_hash.into(),
                 Default::default(),
                 self.coin.as_ref().conf.address_prefixes.clone(),
                 None,
             )
-            .as_pkh()
+            .as_pkh_from_pk(key_pair.public())
             .build()
             .expect("valid address props");
 
@@ -268,7 +266,7 @@ impl BchDockerOps {
                 .wait()
                 .unwrap();
 
-            let script_pubkey = Builder::build_p2pkh(&address_hash.into());
+            let script_pubkey = Builder::build_p2pkh(&key_pair.public().address_hash().into());
 
             bch_outputs.push(TransactionOutput {
                 value: 1000_00000000,
@@ -997,7 +995,6 @@ pub fn get_balance(mm: &MarketMakerIt, coin: &str) -> BalanceResponse {
 pub fn utxo_burn_address() -> Address {
     AddressBuilder::new(
         UtxoAddressFormat::Standard,
-        AddressHashEnum::default_address_hash(),
         ChecksumType::DSHA256,
         NetworkAddressPrefixes {
             p2pkh: [60].into(),
@@ -1005,7 +1002,7 @@ pub fn utxo_burn_address() -> Address {
         },
         None,
     )
-    .as_pkh()
+    .as_pkh(AddressHashEnum::default_address_hash())
     .build()
     .expect("valid address props")
 }

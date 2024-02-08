@@ -632,19 +632,18 @@ pub fn addresses_from_script<T: UtxoCommonOps>(coin: &T, script: &Script) -> Res
             let (addr_format, build_option) = match dst.kind {
                 AddressScriptType::P2PKH => (
                     coin.addr_format_for_standard_scripts(),
-                    AddressBuilderOption::BuildAsPubkeyHash,
+                    AddressBuilderOption::PubkeyHash(dst.hash),
                 ),
                 AddressScriptType::P2SH => (
                     coin.addr_format_for_standard_scripts(),
-                    AddressBuilderOption::BuildAsScriptHash,
+                    AddressBuilderOption::ScriptHash(dst.hash),
                 ),
-                AddressScriptType::P2WPKH => (UtxoAddressFormat::Segwit, AddressBuilderOption::BuildAsPubkeyHash),
-                AddressScriptType::P2WSH => (UtxoAddressFormat::Segwit, AddressBuilderOption::BuildAsScriptHash),
+                AddressScriptType::P2WPKH => (UtxoAddressFormat::Segwit, AddressBuilderOption::PubkeyHash(dst.hash)),
+                AddressScriptType::P2WSH => (UtxoAddressFormat::Segwit, AddressBuilderOption::ScriptHash(dst.hash)),
             };
 
             AddressBuilder::new(
                 addr_format,
-                dst.hash,
                 conf.checksum_type,
                 conf.address_prefixes.clone(),
                 conf.bech32_hrp.clone(),
@@ -1534,12 +1533,11 @@ pub async fn sign_and_send_taker_funding_spend<T: UtxoCommonOps>(
         );
         let payment_address = AddressBuilder::new(
             UtxoAddressFormat::Standard,
-            AddressHashEnum::AddressHash(dhash160(&payment_redeem_script)),
             coin.as_ref().conf.checksum_type,
             coin.as_ref().conf.address_prefixes.clone(),
             coin.as_ref().conf.bech32_hrp.clone(),
         )
-        .as_sh()
+        .as_sh(dhash160(&payment_redeem_script).into())
         .build()
         .map_err(TransactionErr::Plain)?;
         let payment_address_str = payment_address.to_string();
@@ -2732,12 +2730,11 @@ pub fn check_if_my_payment_sent<T: UtxoCommonOps + SwapOps>(
             UtxoRpcClientEnum::Native(client) => {
                 let target_addr = AddressBuilder::new(
                     coin.addr_format_for_standard_scripts(),
-                    hash.into(),
                     coin.as_ref().conf.checksum_type,
                     coin.as_ref().conf.address_prefixes.clone(),
                     coin.as_ref().conf.bech32_hrp.clone(),
                 )
-                .as_sh()
+                .as_sh(hash.into())
                 .build()?;
                 let target_addr = target_addr.to_string();
                 let is_imported = try_s!(client.is_address_imported(&target_addr).await);
@@ -4580,15 +4577,9 @@ pub fn address_from_raw_pubkey(
     hrp: Option<String>,
     addr_format: UtxoAddressFormat,
 ) -> Result<Address, String> {
-    AddressBuilder::new(
-        addr_format,
-        try_s!(Public::from_slice(pub_key)).address_hash().into(),
-        checksum_type,
-        prefixes,
-        hrp,
-    )
-    .as_pkh()
-    .build()
+    AddressBuilder::new(addr_format, checksum_type, prefixes, hrp)
+        .as_pkh_from_pk(&try_s!(Public::from_slice(pub_key)))
+        .build()
 }
 
 pub fn address_from_pubkey(
@@ -4598,8 +4589,8 @@ pub fn address_from_pubkey(
     hrp: Option<String>,
     addr_format: UtxoAddressFormat,
 ) -> Address {
-    AddressBuilder::new(addr_format, pub_key.address_hash().into(), checksum_type, prefixes, hrp)
-        .as_pkh()
+    AddressBuilder::new(addr_format, checksum_type, prefixes, hrp)
+        .as_pkh_from_pk(pub_key)
         .build()
         .expect("valid address props")
 }
@@ -4816,12 +4807,11 @@ where
 
     let payment_address = AddressBuilder::new(
         UtxoAddressFormat::Standard,
-        redeem_script_hash.into(),
         coin.as_ref().conf.checksum_type,
         coin.as_ref().conf.address_prefixes.clone(),
         coin.as_ref().conf.bech32_hrp.clone(),
     )
-    .as_sh()
+    .as_sh(redeem_script_hash.into())
     .build()?;
     let result = SwapPaymentOutputsResult {
         payment_address,

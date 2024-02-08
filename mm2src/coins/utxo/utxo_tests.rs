@@ -3088,12 +3088,11 @@ fn test_withdraw_to_p2pkh() {
     // Create a p2pkh address for the test coin
     let p2pkh_address = AddressBuilder::new(
         UtxoAddressFormat::Standard,
-        coin.as_ref().derivation_method.unwrap_single_addr().hash().clone(),
         *coin.as_ref().derivation_method.unwrap_single_addr().checksum_type(),
         coin.as_ref().conf.address_prefixes.clone(),
         coin.as_ref().conf.bech32_hrp.clone(),
     )
-    .as_pkh()
+    .as_pkh(coin.as_ref().derivation_method.unwrap_single_addr().hash().clone())
     .build()
     .expect("valid address props");
 
@@ -3138,12 +3137,11 @@ fn test_withdraw_to_p2sh() {
     // Create a p2sh address for the test coin
     let p2sh_address = AddressBuilder::new(
         UtxoAddressFormat::Standard,
-        coin.as_ref().derivation_method.unwrap_single_addr().hash().clone(),
         *coin.as_ref().derivation_method.unwrap_single_addr().checksum_type(),
         coin.as_ref().conf.address_prefixes.clone(),
         coin.as_ref().conf.bech32_hrp.clone(),
     )
-    .as_sh()
+    .as_sh(coin.as_ref().derivation_method.unwrap_single_addr().hash().clone())
     .build()
     .expect("valid address props");
 
@@ -3188,12 +3186,11 @@ fn test_withdraw_to_p2wpkh() {
     // Create a p2wpkh address for the test coin
     let p2wpkh_address = AddressBuilder::new(
         UtxoAddressFormat::Segwit,
-        coin.as_ref().derivation_method.unwrap_single_addr().hash().clone(),
         *coin.as_ref().derivation_method.unwrap_single_addr().checksum_type(),
         NetworkAddressPrefixes::default(),
         coin.as_ref().conf.bech32_hrp.clone(),
     )
-    .as_pkh()
+    .as_pkh(coin.as_ref().derivation_method.unwrap_single_addr().hash().clone())
     .build()
     .expect("valid address props");
 

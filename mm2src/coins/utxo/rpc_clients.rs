@@ -2,8 +2,8 @@
 #![cfg_attr(target_arch = "wasm32", allow(dead_code))]
 
 use crate::utxo::utxo_block_header_storage::BlockHeaderStorage;
-use crate::utxo::{output_script, sat_from_big_decimal, GetBlockHeaderError, GetConfirmedTxError, GetTxError,
-                  GetTxHeightError, ScripthashNotification};
+use crate::utxo::{output_script, output_script_p2pk, sat_from_big_decimal, GetBlockHeaderError, GetConfirmedTxError,
+                  GetTxError, GetTxHeightError, ScripthashNotification};
 use crate::{big_decimal_from_sat_unsigned, NumConversError, RpcTransportEventHandler, RpcTransportEventHandlerShared};
 use async_trait::async_trait;
 use chain::{BlockHeader, BlockHeaderBits, BlockHeaderNonce, OutPoint, Transaction as UtxoTx};
@@ -2329,12 +2329,30 @@ impl UtxoRpcClientOps for ElectrumClient {
             rpc_req!(self, "blockchain.scripthash.get_balance").into(),
             JsonRpcErrorType::Internal(err.to_string())
         )));
-        let hash = electrum_script_hash(&output_script);
-        let hash_str = hex::encode(hash);
-        Box::new(
-            self.scripthash_get_balance(&hash_str)
-                .map(move |electrum_balance| electrum_balance.to_big_decimal(decimals)),
-        )
+        let hash = hex::encode(electrum_script_hash(&output_script));
+
+        // If the plain pubkey is available, fetch the balance found in P2PK output as well (if any).
+        if let Some(pubkey) = address.pubkey() {
+            let p2pk_hash = hex::encode(electrum_script_hash(&output_script_p2pk(pubkey)));
+
+            let this = self.clone();
+            let fut = async move {
+                Ok(this
+                    .scripthash_get_balances(vec![hash, p2pk_hash])
+                    .compat()
+                    .await?
+                    .into_iter()
+                    .fold(BigDecimal::from(0), |sum, electrum_balance| {
+                        sum + electrum_balance.to_big_decimal(decimals)
+                    }))
+            };
+            Box::new(fut.boxed().compat())
+        } else {
+            Box::new(
+                self.scripthash_get_balance(&hash)
+                    .map(move |electrum_balance| electrum_balance.to_big_decimal(decimals)),
+            )
+        }
     }
 
     fn display_balances(&self, addresses: Vec<Address>, decimals: u8) -> UtxoRpcFut<Vec<(Address, BigDecimal)>> {

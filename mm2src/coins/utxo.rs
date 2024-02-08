@@ -1925,6 +1925,8 @@ pub fn output_script(address: &Address) -> Result<Script, keys::Error> {
     }
 }
 
+pub fn output_script_p2pk(pubkey: &Public) -> Script { Builder::build_p2pk(pubkey) }
+
 pub fn address_by_conf_and_pubkey_str(
     coin: &str,
     conf: &Json,
@@ -1949,16 +1951,15 @@ pub fn address_by_conf_and_pubkey_str(
     let conf_builder = UtxoConfBuilder::new(conf, &params, coin);
     let utxo_conf = try_s!(conf_builder.build());
     let pubkey_bytes = try_s!(hex::decode(pubkey));
-    let hash = dhash160(&pubkey_bytes);
+    let pubkey = try_s!(Public::from_slice(&pubkey_bytes));
 
     let address = AddressBuilder::new(
         addr_format,
-        hash.into(),
         utxo_conf.checksum_type,
         utxo_conf.address_prefixes,
         utxo_conf.bech32_hrp,
     )
-    .as_pkh()
+    .as_pkh_from_pk(&pubkey)
     .build()?;
     address.display_address()
 }
