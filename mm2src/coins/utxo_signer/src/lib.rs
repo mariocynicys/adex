@@ -140,13 +140,8 @@ pub trait UtxoSignerOps {
                 signer.sign_tx().await
             },
             SignPolicy::WithKeyPair(key_pair) => {
-                let signed = with_key_pair::sign_tx(
-                    params.unsigned_tx,
-                    key_pair,
-                    params.prev_script,
-                    params.signature_version,
-                    self.fork_id(),
-                )?;
+                let signed =
+                    with_key_pair::sign_tx(params.unsigned_tx, key_pair, params.signature_version, self.fork_id())?;
                 Ok(signed)
             },
         }

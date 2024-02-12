@@ -116,19 +116,6 @@ where
     }
 
     #[allow(clippy::result_large_err)]
-    fn prev_script(&self) -> Result<Script, MmError<WithdrawError>> {
-        match self.sender_address().addr_format() {
-            UtxoAddressFormat::Segwit => match Builder::build_p2wpkh(self.sender_address().hash()) {
-                Ok(script) => Ok(script),
-                Err(e) => MmError::err(WithdrawError::InternalError(e.to_string())),
-            },
-            UtxoAddressFormat::Standard | UtxoAddressFormat::CashAddress { .. } => {
-                Ok(Builder::build_p2pkh(self.sender_address().hash()))
-            },
-        }
-    }
-
-    #[allow(clippy::result_large_err)]
     fn on_generating_transaction(&self) -> Result<(), MmError<WithdrawError>>;
 
     #[allow(clippy::result_large_err)]
@@ -150,6 +137,8 @@ where
         let script_pubkey = output_script(&to).map(|script| script.to_bytes())?;
 
         let _utxo_lock = UTXO_LOCK.lock().await;
+        // Do we want to mix P2PK and non-P2PK spends?
+        // Should we make another sweep P2PK method that spends all P2PK balance?
         let (unspents, _) = coin.get_unspent_ordered_list(&self.sender_address()).await?;
         let (value, fee_policy) = if req.max {
             (
@@ -433,7 +422,6 @@ where
         Ok(with_key_pair::sign_tx(
             unsigned_tx,
             &self.key_pair,
-            self.prev_script()?,
             self.signature_version(),
             self.coin.as_ref().conf.fork_id,
         )?)

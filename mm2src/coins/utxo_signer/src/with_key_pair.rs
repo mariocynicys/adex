@@ -41,34 +41,20 @@ impl From<keys::Error> for UtxoSignWithKeyPairError {
 pub fn sign_tx(
     unsigned: TransactionInputSigner,
     key_pair: &KeyPair,
-    prev_script: Script,
     signature_version: SignatureVersion,
     fork_id: u32,
 ) -> UtxoSignWithKeyPairResult<UtxoTx> {
     let mut signed_inputs = vec![];
     match signature_version {
         SignatureVersion::WitnessV0 => {
+            // TODO: just iter() instead of iter().enumerate()
             for (i, _) in unsigned.inputs.iter().enumerate() {
-                signed_inputs.push(p2wpkh_spend(
-                    &unsigned,
-                    i,
-                    key_pair,
-                    prev_script.clone(),
-                    signature_version,
-                    fork_id,
-                )?);
+                signed_inputs.push(p2wpkh_spend(&unsigned, i, key_pair, signature_version, fork_id)?);
             }
         },
         _ => {
             for (i, _) in unsigned.inputs.iter().enumerate() {
-                signed_inputs.push(p2pkh_spend(
-                    &unsigned,
-                    i,
-                    key_pair,
-                    prev_script.clone(),
-                    signature_version,
-                    fork_id,
-                )?);
+                signed_inputs.push(p2pkh_spend(&unsigned, i, key_pair, signature_version, fork_id)?);
             }
         },
     }
@@ -85,7 +71,19 @@ pub fn p2pk_spend(
 ) -> UtxoSignWithKeyPairResult<TransactionInput> {
     let unsigned_input = get_input(signer, input_index)?;
 
+    // DISCUSS: Why are we doing this check? Solely to check whether we are spending
+    // a UTXO owned by us and not someone else? Or to make sure we are not signing another
+    // transaction type (not p2pk)?
+    // I think none should ever happen!
     let script = Builder::build_p2pk(key_pair.public());
+    if script != unsigned_input.prev_script {
+        return MmError::err(UtxoSignWithKeyPairError::MismatchScript {
+            script_type: "P2PK".to_owned(),
+            script,
+            prev_script: unsigned_input.prev_script.clone(),
+        });
+    }
+
     let signature = calc_and_sign_sighash(
         signer,
         input_index,
@@ -103,18 +101,17 @@ pub fn p2pkh_spend(
     signer: &TransactionInputSigner,
     input_index: usize,
     key_pair: &KeyPair,
-    prev_script: Script,
     signature_version: SignatureVersion,
     fork_id: u32,
 ) -> UtxoSignWithKeyPairResult<TransactionInput> {
     let unsigned_input = get_input(signer, input_index)?;
 
     let script = Builder::build_p2pkh(&key_pair.public().address_hash().into());
-    if script != prev_script {
+    if script != unsigned_input.prev_script {
         return MmError::err(UtxoSignWithKeyPairError::MismatchScript {
             script_type: "P2PKH".to_owned(),
             script,
-            prev_script,
+            prev_script: unsigned_input.prev_script.clone(),
         });
     }
 
@@ -170,7 +167,6 @@ pub fn p2wpkh_spend(
     signer: &TransactionInputSigner,
     input_index: usize,
     key_pair: &KeyPair,
-    prev_script: Script,
     signature_version: SignatureVersion,
     fork_id: u32,
 ) -> UtxoSignWithKeyPairResult<TransactionInput> {
@@ -178,11 +174,11 @@ pub fn p2wpkh_spend(
 
     let script_code = Builder::build_p2pkh(&key_pair.public().address_hash().into()); // this is the scriptCode by BIP-0143: for P2WPKH scriptCode is P2PKH
     let script_pub_key = Builder::build_p2wpkh(&key_pair.public().address_hash().into())?;
-    if script_pub_key != prev_script {
+    if script_pub_key != unsigned_input.prev_script {
         return MmError::err(UtxoSignWithKeyPairError::MismatchScript {
             script_type: "P2WPKH".to_owned(),
             script: script_pub_key,
-            prev_script,
+            prev_script: unsigned_input.prev_script.clone(),
         });
     }
 

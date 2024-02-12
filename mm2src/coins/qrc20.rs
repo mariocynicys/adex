@@ -541,13 +541,9 @@ impl Qrc20Coin {
         let my_address = self.utxo.derivation_method.single_addr_or_err()?;
         let key_pair = self.utxo.priv_key_policy.activated_key_or_err()?;
 
-        let prev_script = self
-            .script_for_address(my_address)
-            .map_err(|e| Qrc20GenTxError::InvalidAddress(e.to_string()))?;
         let signed = sign_tx(
             unsigned,
             key_pair,
-            prev_script,
             self.utxo.conf.signature_version,
             self.utxo.conf.fork_id,
         )?;

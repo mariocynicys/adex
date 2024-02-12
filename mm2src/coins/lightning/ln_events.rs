@@ -220,13 +220,9 @@ fn sign_funding_transaction(
         .activated_key_or_err()
         .map_err(|e| SignFundingTransactionError::Internal(e.to_string()))?;
 
-    let prev_script = coin
-        .script_for_address(my_address)
-        .map_err(|e| SignFundingTransactionError::Internal(e.to_string()))?;
     let signed = sign_tx(
         unsigned,
         key_pair,
-        prev_script,
         SignatureVersion::WitnessV0,
         coin.as_ref().conf.fork_id,
     )

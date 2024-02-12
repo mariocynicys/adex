@@ -310,6 +310,9 @@ pub enum FeePolicy {
 pub struct CachedUnspentInfo {
     pub outpoint: OutPoint,
     pub value: u64,
+    // TODO: Remove this field. It's always gonna be `RecentlySpentOutPoints::for_script_pubkey`.
+    // This is viable since we have one and only one `for_script_pubkey`.
+    pub script: Option<Script>,
 }
 
 impl From<UnspentInfo> for CachedUnspentInfo {
@@ -317,6 +320,7 @@ impl From<UnspentInfo> for CachedUnspentInfo {
         CachedUnspentInfo {
             outpoint: unspent.outpoint,
             value: unspent.value,
+            script: unspent.script,
         }
     }
 }
@@ -327,6 +331,7 @@ impl From<CachedUnspentInfo> for UnspentInfo {
             outpoint: cached.outpoint,
             value: cached.value,
             height: None,
+            script: cached.script,
         }
     }
 }
@@ -355,7 +360,7 @@ impl RecentlySpentOutPoints {
     pub fn add_spent(&mut self, inputs: Vec<UnspentInfo>, spend_tx_hash: H256, outputs: Vec<TransactionOutput>) {
         let inputs: HashSet<_> = inputs.into_iter().map(From::from).collect();
         let to_replace: HashSet<_> = outputs
-            .iter()
+            .into_iter()
             .enumerate()
             .filter_map(|(index, output)| {
                 if output.script_pubkey == self.for_script_pubkey {
@@ -365,6 +370,7 @@ impl RecentlySpentOutPoints {
                             index: index as u32,
                         },
                         value: output.value,
+                        script: Some(output.script_pubkey.into()),
                     })
                 } else {
                     None
@@ -1890,6 +1896,7 @@ where
             outpoint: input.previous_output,
             value: input.amount,
             height: None,
+            script: Some(input.prev_script.clone()),
         })
         .collect();
 
@@ -1898,12 +1905,9 @@ where
         _ => coin.as_ref().conf.signature_version,
     };
 
-    let prev_script = utxo_common::output_script_checked(coin.as_ref(), my_address)
-        .map_err(|e| TransactionErr::Plain(ERRL!("{}", e)))?;
     let signed = try_tx_s!(sign_tx(
         unsigned,
         key_pair,
-        prev_script,
         signature_version,
         coin.as_ref().conf.fork_id
     ));
@@ -1925,6 +1929,7 @@ pub fn output_script(address: &Address) -> Result<Script, keys::Error> {
     }
 }
 
+/// Builds transaction output script for a legacy P2PK address
 pub fn output_script_p2pk(pubkey: &Public) -> Script { Builder::build_p2pk(pubkey) }
 
 pub fn address_by_conf_and_pubkey_str(

@@ -1,4 +1,5 @@
 use super::*;
+use crate::utxo::output_script;
 use crate::utxo::rpc_clients::UnspentInfo;
 use crate::{DexFee, TxFeeDetails, WaitForHTLCTxSpendArgs};
 use chain::OutPoint;
@@ -92,6 +93,13 @@ fn test_withdraw_to_p2sh_address_should_fail() {
 
 #[test]
 fn test_withdraw_impl_fee_details() {
+    // priv_key of qXxsj5RtciAby9T7m98AgAATL4zTi4UwDG
+    let priv_key = [
+        3, 98, 177, 3, 108, 39, 234, 144, 131, 178, 103, 103, 127, 80, 230, 166, 53, 68, 147, 215, 42, 216, 144, 72,
+        172, 110, 180, 13, 123, 179, 10, 49,
+    ];
+    let (_ctx, coin) = qrc20_coin_for_test(priv_key, None);
+
     Qrc20Coin::get_unspent_ordered_list.mock_safe(|coin, _| {
         let cache = block_on(coin.as_ref().recently_spent_outpoints.lock());
         let unspents = vec![UnspentInfo {
@@ -101,16 +109,13 @@ fn test_withdraw_impl_fee_details() {
             },
             value: 1000000000,
             height: Default::default(),
+            script: Some(
+                coin.script_for_address(coin.as_ref().derivation_method.unwrap_single_addr())
+                    .unwrap(),
+            ),
         }];
         MockResult::Return(Box::pin(futures::future::ok((unspents, cache))))
     });
-
-    // priv_key of qXxsj5RtciAby9T7m98AgAATL4zTi4UwDG
-    let priv_key = [
-        3, 98, 177, 3, 108, 39, 234, 144, 131, 178, 103, 103, 127, 80, 230, 166, 53, 68, 147, 215, 42, 216, 144, 72,
-        172, 110, 180, 13, 123, 179, 10, 49,
-    ];
-    let (_ctx, coin) = qrc20_coin_for_test(priv_key, None);
 
     let withdraw_req = WithdrawRequest {
         amount: 10.into(),

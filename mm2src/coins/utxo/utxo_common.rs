@@ -835,6 +835,7 @@ impl<'a, T: AsRef<UtxoCoinFields> + UtxoTxGenerationOps> UtxoTxBuilder<'a, T> {
             .inputs
             .extend(inputs.into_iter().map(|input| UnsignedTransactionInput {
                 previous_output: input.outpoint,
+                prev_script: input.script.unwrap_or(Vec::new().into()),
                 sequence: SEQUENCE_FINAL,
                 amount: input.value,
                 witness: Vec::new(),
@@ -1004,6 +1005,7 @@ impl<'a, T: AsRef<UtxoCoinFields> + UtxoTxGenerationOps> UtxoTxBuilder<'a, T> {
         for utxo in self.available_inputs.clone() {
             self.tx.inputs.push(UnsignedTransactionInput {
                 previous_output: utxo.outpoint,
+                prev_script: utxo.script.unwrap_or(Vec::new().into()),
                 sequence: SEQUENCE_FINAL,
                 amount: utxo.value,
                 witness: vec![],
@@ -1093,6 +1095,7 @@ impl<'a, T: AsRef<UtxoCoinFields> + UtxoTxGenerationOps> UtxoTxBuilder<'a, T> {
             } else {
                 self.tx.inputs.push(UnsignedTransactionInput {
                     previous_output: utxo.outpoint,
+                    prev_script: utxo.script.unwrap_or(Vec::new().into()),
                     sequence: SEQUENCE_FINAL,
                     amount: utxo.value,
                     witness: vec![],
@@ -1234,6 +1237,7 @@ async fn p2sh_spending_tx_preimage<T: UtxoCommonOps>(
                 hash: prev_tx.hash(),
                 index: DEFAULT_SWAP_VOUT as u32,
             },
+            prev_script: Vec::new().into(),
             amount,
             witness: Vec::new(),
         }],
@@ -2971,25 +2975,23 @@ pub fn send_raw_tx_bytes(
 }
 
 /// Helper to load unspent outputs from cache or rpc
-/// also returns first previous scriptpubkey
 async fn get_unspents_for_inputs(
     coin: &UtxoCoinFields,
     inputs: &Vec<TransactionInput>,
-) -> Result<(Option<Script>, Vec<UnspentInfo>), RawTransactionError> {
+) -> Result<Vec<UnspentInfo>, RawTransactionError> {
     let txids_reversed = inputs
         .iter()
         .map(|input| input.previous_output.hash.reversed().into()) // reverse hashes to send to electrum
         .collect::<HashSet<H256Json>>();
 
     if txids_reversed.is_empty() {
-        return Ok((None, vec![]));
+        return Ok(vec![]);
     }
 
     let prev_txns_loaded = utxo_common::get_verbose_transactions_from_cache_or_rpc(coin, txids_reversed)
         .await
         .map_err(|err| RawTransactionError::InvalidParam(err.to_string()))?;
 
-    let mut prev_script = None;
     let mut unspents_loaded = vec![];
 
     for input in inputs {
@@ -3009,15 +3011,13 @@ async fn get_unspents_for_inputs(
                 input.previous_output.hash, input.previous_output.index
             )));
         }
-        if prev_script.is_none() {
-            // get first previous script pubkey
-            let script_bytes: Vec<u8> = prev_tx.vout[input.previous_output.index as usize]
+        let prev_script = Script::from(
+            prev_tx.vout[input.previous_output.index as usize]
                 .clone()
                 .script
                 .hex
-                .into();
-            prev_script = Some(Script::from(script_bytes));
-        }
+                .to_vec(),
+        );
         let prev_amount = prev_tx.vout[input.previous_output.index as usize]
             .value
             .ok_or_else(|| {
@@ -3033,9 +3033,10 @@ async fn get_unspents_for_inputs(
             value: sat_from_big_decimal(&prev_amount, coin.decimals)
                 .expect("Conversion to satoshi from bigdecimal must be valid"),
             height: None,
+            script: Some(prev_script),
         });
     }
-    Ok((prev_script, unspents_loaded))
+    Ok(unspents_loaded)
 }
 
 /// Takes args with a raw transaction in hexadecimal format and previous transactions data as input
@@ -3061,15 +3062,13 @@ async fn sign_raw_utxo_tx<T: AsRef<UtxoCoinFields> + UtxoTxGenerationOps>(
         hex::decode(args.tx_hex.as_bytes()).map_to_mm(|e| RawTransactionError::DecodeError(e.to_string()))?;
     let tx: UtxoTx = deserialize(tx_bytes.as_slice()).map_to_mm(|e| RawTransactionError::DecodeError(e.to_string()))?;
 
-    let mut prev_script = HashSet::new();
     let mut unspents = vec![];
 
     if let Some(prev_txns) = &args.prev_txns {
         for prev_utxo in prev_txns.iter() {
-            // get first previous utxo script assuming all are the same
-            let script_bytes = hex::decode(prev_utxo.clone().script_pub_key)
-                .map_to_mm(|e| RawTransactionError::DecodeError(e.to_string()))?;
-            prev_script.insert(Script::from(script_bytes));
+            let prev_script = hex::decode(prev_utxo.clone().script_pub_key)
+                .map_to_mm(|e| RawTransactionError::DecodeError(e.to_string()))?
+                .into();
 
             let prev_hash = hex::decode(prev_utxo.tx_hash.as_bytes())
                 .map_to_mm(|e| RawTransactionError::DecodeError(e.to_string()))?;
@@ -3082,6 +3081,7 @@ async fn sign_raw_utxo_tx<T: AsRef<UtxoCoinFields> + UtxoTxGenerationOps>(
                 value: sat_from_big_decimal(&prev_utxo.amount, coin.as_ref().decimals)
                     .expect("conversion satoshi from bigdecimal must be valid"),
                 height: None,
+                script: Some(prev_script),
             });
         }
     }
@@ -3099,11 +3099,8 @@ async fn sign_raw_utxo_tx<T: AsRef<UtxoCoinFields> + UtxoTxGenerationOps>(
 
     // If some previous utxos are not provided in the params load them from the chain
     if !inputs_to_load.is_empty() {
-        let (loaded_script, loaded_unspents) = get_unspents_for_inputs(coin.as_ref(), &inputs_to_load).await?;
+        let loaded_unspents = get_unspents_for_inputs(coin.as_ref(), &inputs_to_load).await?;
         unspents.extend(loaded_unspents.into_iter());
-        if let Some(loaded_script) = loaded_script {
-            prev_script.insert(loaded_script);
-        }
     }
 
     // TODO: use zeroise for privkey
@@ -3121,31 +3118,13 @@ async fn sign_raw_utxo_tx<T: AsRef<UtxoCoinFields> + UtxoTxGenerationOps>(
         .map_err(|e| RawTransactionError::InvalidParam(e.to_string()))?;
     debug!("Unsigned tx = {:?} for signing", unsigned);
 
-    let prev_script = match prev_script.len() {
-        0 => {
-            return MmError::err(RawTransactionError::NonExistentPrevOutputError(String::from(
-                "no previous script",
-            )))
-        },
-        1 => prev_script.into_iter().next().unwrap(),
-        _ => {
-            return MmError::err(RawTransactionError::InvalidParam(String::from(
-                "spends are from same address only",
-            )))
-        },
-    };
-    let signature_version = match prev_script.is_pay_to_witness_key_hash() {
-        true => SignatureVersion::WitnessV0,
-        _ => coin.as_ref().conf.signature_version,
-    };
-    let tx_signed = sign_tx(
-        unsigned,
-        key_pair,
-        prev_script,
-        signature_version,
-        coin.as_ref().conf.fork_id,
-    )
-    .map_err(|err| RawTransactionError::SigningError(err.to_string()))?;
+    let signature_version = coin.as_ref().conf.signature_version;
+    // let signature_version = match prev_script.is_pay_to_witness_key_hash() {
+    //     true => SignatureVersion::WitnessV0,
+    //     _ => coin.as_ref().conf.signature_version,
+    // };
+    let tx_signed = sign_tx(unsigned, key_pair, signature_version, coin.as_ref().conf.fork_id)
+        .map_err(|err| RawTransactionError::SigningError(err.to_string()))?;
 
     let tx_signed_bytes = serialize_with_flags(&tx_signed, SERIALIZE_TRANSACTION_WITNESS);
     Ok(RawTransactionRes {

@@ -400,6 +400,7 @@ impl SlpToken {
             outputs,
         };
         Ok((preimage, recently_spent))
+        //////////////////////////////////////////////////
     }
 
     pub async fn send_slp_outputs(&self, slp_outputs: Vec<SlpOutput>) -> Result<UtxoTx, TransactionErr> {
@@ -457,6 +458,7 @@ impl SlpToken {
                 },
                 value: 0,
                 height: None,
+                script: None,
             },
             slp_amount: slp_satoshis,
         };
@@ -553,6 +555,7 @@ impl SlpToken {
                 },
                 value: tx.outputs[1].value,
                 height: None,
+                script: None,
             },
             slp_amount,
         };
@@ -604,6 +607,7 @@ impl SlpToken {
                 },
                 value: tx.outputs[1].value,
                 height: None,
+                script: None,
             },
             slp_amount,
         };
@@ -672,7 +676,6 @@ impl SlpToken {
                     &unsigned,
                     i,
                     my_key_pair,
-                    my_script_pubkey.clone(),
                     self.platform_coin.as_ref().conf.signature_version,
                     self.platform_coin.as_ref().conf.fork_id,
                 )
@@ -1683,7 +1686,7 @@ impl MmCoin for SlpToken {
             let signed = sign_tx(
                 unsigned,
                 key_pair,
-                prev_script,
+                //prev_script,
                 coin.platform_conf().signature_version,
                 coin.platform_conf().fork_id,
             )?;
