@@ -347,6 +347,10 @@ fn test_one_hundred_maker_payments_in_a_row_native() {
                 },
                 value: tx.outputs[2].value,
                 height: None,
+                script: Some(
+                    coin.script_for_address(coin.as_ref().derivation_method.unwrap_single_addr())
+                        .unwrap(),
+                ),
             });
             sent_tx.push(tx);
         }
@@ -367,6 +371,7 @@ fn test_one_hundred_maker_payments_in_a_row_native() {
         },
         value: last_tx.outputs[2].value,
         height: None,
+        script: Some(last_tx.outputs[2].script_pubkey.clone().into()),
     };
     assert_eq!(vec![expected_unspent], unspents);
 }
