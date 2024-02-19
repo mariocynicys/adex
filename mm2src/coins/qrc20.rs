@@ -538,7 +538,6 @@ impl Qrc20Coin {
             .build()
             .await?;
 
-        let my_address = self.utxo.derivation_method.single_addr_or_err()?;
         let key_pair = self.utxo.priv_key_policy.activated_key_or_err()?;
 
         let signed = sign_tx(

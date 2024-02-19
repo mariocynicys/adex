@@ -8,7 +8,7 @@ use crate::{big_decimal_from_sat_unsigned, NumConversError, RpcTransportEventHan
 use async_trait::async_trait;
 use chain::{BlockHeader, BlockHeaderBits, BlockHeaderNonce, OutPoint, Transaction as UtxoTx};
 use common::custom_futures::{select_ok_sequential, timeout::FutureTimerExt};
-use common::custom_iter::{CollectInto, TryIntoGroupMap};
+use common::custom_iter::TryIntoGroupMap;
 use common::executor::{abortable_queue, abortable_queue::AbortableQueue, AbortableSystem, SpawnFuture, Timer};
 use common::jsonrpc_client::{JsonRpcBatchClient, JsonRpcBatchResponse, JsonRpcClient, JsonRpcError, JsonRpcErrorType,
                              JsonRpcId, JsonRpcMultiClient, JsonRpcRemoteAddr, JsonRpcRequest, JsonRpcRequestEnum,

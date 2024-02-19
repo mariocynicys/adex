@@ -1613,7 +1613,6 @@ impl MmCoin for SlpToken {
     fn withdraw(&self, req: WithdrawRequest) -> WithdrawFut {
         let coin = self.clone();
         let fut = async move {
-            let my_address = coin.platform_coin.as_ref().derivation_method.single_addr_or_err()?;
             let key_pair = coin.platform_coin.as_ref().priv_key_policy.activated_key_or_err()?;
 
             let address = CashAddress::decode(&req.to).map_to_mm(WithdrawError::InvalidAddress)?;
@@ -1679,14 +1678,9 @@ impl MmCoin for SlpToken {
                 WithdrawError::from_generate_tx_error(gen_tx_error, coin.platform_ticker().into(), platform_decimals)
             })?;
 
-            let prev_script = coin
-                .platform_coin
-                .script_for_address(my_address)
-                .map_err(|e| WithdrawError::InvalidAddress(e.to_string()))?;
             let signed = sign_tx(
                 unsigned,
                 key_pair,
-                //prev_script,
                 coin.platform_conf().signature_version,
                 coin.platform_conf().fork_id,
             )?;

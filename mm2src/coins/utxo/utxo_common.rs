@@ -3089,12 +3089,8 @@ async fn sign_raw_utxo_tx<T: AsRef<UtxoCoinFields> + UtxoTxGenerationOps>(
     let inputs_to_load = tx
         .inputs()
         .iter()
+        .filter(|input| !unspents.iter().any(|u| u.outpoint == input.previous_output))
         .cloned()
-        .filter(|input| {
-            !unspents.iter().any(|u| {
-                u.outpoint.hash == input.previous_output.hash && u.outpoint.index == input.previous_output.index
-            })
-        })
         .collect::<Vec<TransactionInput>>();
 
     // If some previous utxos are not provided in the params load them from the chain

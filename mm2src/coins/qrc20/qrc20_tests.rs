@@ -1,5 +1,4 @@
 use super::*;
-use crate::utxo::output_script;
 use crate::utxo::rpc_clients::UnspentInfo;
 use crate::{DexFee, TxFeeDetails, WaitForHTLCTxSpendArgs};
 use chain::OutPoint;
