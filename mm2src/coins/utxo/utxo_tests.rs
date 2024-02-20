@@ -195,7 +195,7 @@ fn test_generate_transaction() {
         value: 10000000000,
         outpoint: OutPoint::default(),
         height: Default::default(),
-        script: Some(Vec::new().into()),
+        script: Vec::new().into(),
     }];
 
     let outputs = vec![TransactionOutput {
@@ -214,7 +214,7 @@ fn test_generate_transaction() {
         value: 100000,
         outpoint: OutPoint::default(),
         height: Default::default(),
-        script: Some(Vec::new().into()),
+        script: Vec::new().into(),
     }];
 
     let outputs = vec![TransactionOutput {
@@ -239,7 +239,7 @@ fn test_generate_transaction() {
         value: 100000,
         outpoint: OutPoint::default(),
         height: Default::default(),
-        script: Some(Vec::new().into()),
+        script: Vec::new().into(),
     }];
 
     let outputs = vec![TransactionOutput {
@@ -266,7 +266,7 @@ fn test_generate_transaction() {
         value: 100000,
         outpoint: OutPoint::default(),
         height: Default::default(),
-        script: Some(Vec::new().into()),
+        script: Vec::new().into(),
     }];
 
     let outputs = vec![TransactionOutput {
@@ -588,10 +588,9 @@ fn test_withdraw_impl_set_fixed_fee() {
             },
             value: 1000000000,
             height: Default::default(),
-            script: Some(
-                coin.script_for_address(coin.as_ref().derivation_method.unwrap_single_addr())
-                    .unwrap(),
-            ),
+            script: coin
+                .script_for_address(coin.as_ref().derivation_method.unwrap_single_addr())
+                .unwrap(),
         }];
         MockResult::Return(Box::pin(futures::future::ok((unspents, cache))))
     });
@@ -634,10 +633,9 @@ fn test_withdraw_impl_sat_per_kb_fee() {
             },
             value: 1000000000,
             height: Default::default(),
-            script: Some(
-                coin.script_for_address(coin.as_ref().derivation_method.unwrap_single_addr())
-                    .unwrap(),
-            ),
+            script: coin
+                .script_for_address(coin.as_ref().derivation_method.unwrap_single_addr())
+                .unwrap(),
         }];
         MockResult::Return(Box::pin(futures::future::ok((unspents, cache))))
     });
@@ -683,10 +681,9 @@ fn test_withdraw_impl_sat_per_kb_fee_amount_equal_to_max() {
             },
             value: 1000000000,
             height: Default::default(),
-            script: Some(
-                coin.script_for_address(coin.as_ref().derivation_method.unwrap_single_addr())
-                    .unwrap(),
-            ),
+            script: coin
+                .script_for_address(coin.as_ref().derivation_method.unwrap_single_addr())
+                .unwrap(),
         }];
         MockResult::Return(Box::pin(futures::future::ok((unspents, cache))))
     });
@@ -734,10 +731,9 @@ fn test_withdraw_impl_sat_per_kb_fee_amount_equal_to_max_dust_included_to_fee() 
             },
             value: 1000000000,
             height: Default::default(),
-            script: Some(
-                coin.script_for_address(coin.as_ref().derivation_method.unwrap_single_addr())
-                    .unwrap(),
-            ),
+            script: coin
+                .script_for_address(coin.as_ref().derivation_method.unwrap_single_addr())
+                .unwrap(),
         }];
         MockResult::Return(Box::pin(futures::future::ok((unspents, cache))))
     });
@@ -785,10 +781,9 @@ fn test_withdraw_impl_sat_per_kb_fee_amount_over_max() {
             },
             value: 1000000000,
             height: Default::default(),
-            script: Some(
-                coin.script_for_address(coin.as_ref().derivation_method.unwrap_single_addr())
-                    .unwrap(),
-            ),
+            script: coin
+                .script_for_address(coin.as_ref().derivation_method.unwrap_single_addr())
+                .unwrap(),
         }];
         MockResult::Return(Box::pin(futures::future::ok((unspents, cache))))
     });
@@ -823,10 +818,9 @@ fn test_withdraw_impl_sat_per_kb_fee_max() {
             },
             value: 1000000000,
             height: Default::default(),
-            script: Some(
-                coin.script_for_address(coin.as_ref().derivation_method.unwrap_single_addr())
-                    .unwrap(),
-            ),
+            script: coin
+                .script_for_address(coin.as_ref().derivation_method.unwrap_single_addr())
+                .unwrap(),
         }];
         MockResult::Return(Box::pin(futures::future::ok((unspents, cache))))
     });
@@ -879,10 +873,9 @@ fn test_withdraw_kmd_rewards_impl(
             },
             value: tx.outputs[0].value,
             height: unspent_height,
-            script: Some(
-                coin.script_for_address(coin.as_ref().derivation_method.unwrap_single_addr())
-                    .unwrap(),
-            ),
+            script: coin
+                .script_for_address(coin.as_ref().derivation_method.unwrap_single_addr())
+                .unwrap(),
         }];
         let cache = block_on(coin.as_ref().recently_spent_outpoints.lock());
         MockResult::Return(Box::pin(futures::future::ok((unspents, cache))))
@@ -971,10 +964,9 @@ fn test_withdraw_rick_rewards_none() {
             },
             value: tx.outputs[0].value,
             height: Some(1431628),
-            script: Some(
-                coin.script_for_address(coin.as_ref().derivation_method.unwrap_single_addr())
-                    .unwrap(),
-            ),
+            script: coin
+                .script_for_address(coin.as_ref().derivation_method.unwrap_single_addr())
+                .unwrap(),
         }];
         let cache = block_on(coin.as_ref().recently_spent_outpoints.lock());
         MockResult::Return(Box::pin(futures::future::ok((unspents, cache))))
@@ -1183,7 +1175,7 @@ fn test_generate_transaction_relay_fee_is_used_when_dynamic_fee_is_lower() {
         value: 1000000000,
         outpoint: OutPoint::default(),
         height: Default::default(),
-        script: Some(Vec::new().into()),
+        script: Vec::new().into(),
     }];
 
     let outputs = vec![TransactionOutput {
@@ -1226,7 +1218,7 @@ fn test_generate_transaction_relay_fee_is_used_when_dynamic_fee_is_lower_and_ded
         value: 1000000000,
         outpoint: OutPoint::default(),
         height: Default::default(),
-        script: Some(Vec::new().into()),
+        script: Vec::new().into(),
     }];
 
     let outputs = vec![TransactionOutput {
@@ -1273,7 +1265,7 @@ fn test_generate_tx_fee_is_correct_when_dynamic_fee_is_larger_than_relay() {
             value: 1000000000,
             outpoint: OutPoint::default(),
             height: Default::default(),
-            script: Some(Vec::new().into()),
+            script: Vec::new().into(),
         };
         20
     ];
@@ -1804,7 +1796,7 @@ fn test_qtum_my_balance() {
                 },
                 value: 5000000000,
                 height: Default::default(),
-                script: Some(Vec::new().into()),
+                script: Vec::new().into(),
             },
             UnspentInfo {
                 outpoint: OutPoint {
@@ -1813,7 +1805,7 @@ fn test_qtum_my_balance() {
                 },
                 value: 1600000000,
                 height: Default::default(),
-                script: Some(Vec::new().into()),
+                script: Vec::new().into(),
             },
         ];
         // unspendable (2.0)
@@ -1824,7 +1816,7 @@ fn test_qtum_my_balance() {
             },
             value: 200000000,
             height: Default::default(),
-            script: Some(Vec::new().into()),
+            script: Vec::new().into(),
         }];
         MockResult::Return(Box::pin(futures::future::ok((
             MatureUnspentList { mature, immature },
@@ -1915,7 +1907,7 @@ fn test_get_mature_unspent_ordered_map_from_cache_impl(
             },
             value: 1000000000,
             height: unspent_height,
-            script: Some(Vec::new().into()),
+            script: Vec::new().into(),
         }];
         MockResult::Return(Box::new(futures01::future::ok(unspents)))
     });
@@ -2090,13 +2082,13 @@ fn test_native_client_unspents_filtered_using_tx_cache_single_tx_in_cache() {
             outpoint: tx.inputs[0].previous_output,
             value: 886737,
             height: Some(642293),
-            script: Some(output_script.clone()),
+            script: output_script.clone(),
         },
         UnspentInfo {
             outpoint: tx.inputs[1].previous_output,
             value: 88843,
             height: Some(642293),
-            script: Some(output_script.clone()),
+            script: output_script.clone(),
         },
     ];
 
@@ -2118,7 +2110,7 @@ fn test_native_client_unspents_filtered_using_tx_cache_single_tx_in_cache() {
         value: tx.outputs[2].value,
         height: None,
         // Should be the same as: Some(output_script.clone()),
-        script: Some(tx.outputs[2].script_pubkey.clone().into()),
+        script: tx.outputs[2].script_pubkey.clone().into(),
     };
     assert_eq!(vec![expected_unspent], unspents_ordered);
 }
@@ -2140,13 +2132,13 @@ fn test_native_client_unspents_filtered_using_tx_cache_single_several_chained_tx
             outpoint: tx_0.inputs[0].previous_output,
             value: 886737,
             height: Some(642293),
-            script: Some(output_script.clone()),
+            script: output_script.clone(),
         },
         UnspentInfo {
             outpoint: tx_0.inputs[1].previous_output,
             value: 88843,
             height: Some(642293),
-            script: Some(output_script.clone()),
+            script: output_script.clone(),
         },
     ];
     block_on(coin.as_ref().recently_spent_outpoints.lock()).add_spent(spent_by_tx_0.clone(), tx_0.hash(), tx_0.outputs);
@@ -2158,19 +2150,19 @@ fn test_native_client_unspents_filtered_using_tx_cache_single_several_chained_tx
             outpoint: tx_1.inputs[0].previous_output,
             value: 300803,
             height: Some(642293),
-            script: Some(output_script.clone()),
+            script: output_script.clone(),
         },
         UnspentInfo {
             outpoint: tx_1.inputs[1].previous_output,
             value: 888544,
             height: Some(642293),
-            script: Some(output_script.clone()),
+            script: output_script.clone(),
         },
         UnspentInfo {
             outpoint: tx_1.inputs[2].previous_output,
             value: 888642,
             height: Some(642293),
-            script: Some(output_script.clone()),
+            script: output_script.clone(),
         },
     ];
     block_on(coin.as_ref().recently_spent_outpoints.lock()).add_spent(spent_by_tx_1.clone(), tx_1.hash(), tx_1.outputs);
@@ -2181,13 +2173,13 @@ fn test_native_client_unspents_filtered_using_tx_cache_single_several_chained_tx
             outpoint: tx_2.inputs[0].previous_output,
             value: 832532,
             height: Some(642293),
-            script: Some(output_script.clone()),
+            script: output_script.clone(),
         },
         UnspentInfo {
             outpoint: tx_2.inputs[1].previous_output,
             value: 888823,
             height: Some(642293),
-            script: Some(output_script.clone()),
+            script: output_script.clone(),
         },
     ];
     block_on(coin.as_ref().recently_spent_outpoints.lock()).add_spent(
@@ -2214,7 +2206,7 @@ fn test_native_client_unspents_filtered_using_tx_cache_single_several_chained_tx
         value: tx_2.outputs[2].value,
         height: None,
         // Should be the same as: Some(output_script.clone()),
-        script: Some(tx_2.outputs[2].script_pubkey.clone().into()),
+        script: tx_2.outputs[2].script_pubkey.clone().into(),
     };
     assert_eq!(vec![expected_unspent], unspents_ordered);
 }
@@ -2787,7 +2779,7 @@ fn test_generate_tx_doge_fee() {
         outpoint: Default::default(),
         value: 1000000000000,
         height: None,
-        script: Some(Vec::new().into()),
+        script: Vec::new().into(),
     }];
     let outputs = vec![TransactionOutput {
         value: 100000000,
@@ -2804,7 +2796,7 @@ fn test_generate_tx_doge_fee() {
         outpoint: Default::default(),
         value: 1000000000000,
         height: None,
-        script: Some(Vec::new().into()),
+        script: Vec::new().into(),
     }];
     let outputs = vec![
         TransactionOutput {
@@ -2825,7 +2817,7 @@ fn test_generate_tx_doge_fee() {
         outpoint: Default::default(),
         value: 1000000000000,
         height: None,
-        script: Some(Vec::new().into()),
+        script: Vec::new().into(),
     }];
     let outputs = vec![
         TransactionOutput {
@@ -3140,10 +3132,9 @@ fn test_withdraw_to_p2pkh() {
             },
             value: 1000000000,
             height: Default::default(),
-            script: Some(
-                coin.script_for_address(coin.as_ref().derivation_method.unwrap_single_addr())
-                    .unwrap(),
-            ),
+            script: coin
+                .script_for_address(coin.as_ref().derivation_method.unwrap_single_addr())
+                .unwrap(),
         }];
         MockResult::Return(Box::pin(futures::future::ok((unspents, cache))))
     });
@@ -3193,10 +3184,9 @@ fn test_withdraw_to_p2sh() {
             },
             value: 1000000000,
             height: Default::default(),
-            script: Some(
-                coin.script_for_address(coin.as_ref().derivation_method.unwrap_single_addr())
-                    .unwrap(),
-            ),
+            script: coin
+                .script_for_address(coin.as_ref().derivation_method.unwrap_single_addr())
+                .unwrap(),
         }];
         MockResult::Return(Box::pin(futures::future::ok((unspents, cache))))
     });
@@ -3246,10 +3236,9 @@ fn test_withdraw_to_p2wpkh() {
             },
             value: 1000000000,
             height: Default::default(),
-            script: Some(
-                coin.script_for_address(coin.as_ref().derivation_method.unwrap_single_addr())
-                    .unwrap(),
-            ),
+            script: coin
+                .script_for_address(coin.as_ref().derivation_method.unwrap_single_addr())
+                .unwrap(),
         }];
         MockResult::Return(Box::pin(futures::future::ok((unspents, cache))))
     });

@@ -835,7 +835,7 @@ impl<'a, T: AsRef<UtxoCoinFields> + UtxoTxGenerationOps> UtxoTxBuilder<'a, T> {
             .inputs
             .extend(inputs.into_iter().map(|input| UnsignedTransactionInput {
                 previous_output: input.outpoint,
-                prev_script: input.script.unwrap_or(Vec::new().into()),
+                prev_script: input.script,
                 sequence: SEQUENCE_FINAL,
                 amount: input.value,
                 witness: Vec::new(),
@@ -1005,7 +1005,7 @@ impl<'a, T: AsRef<UtxoCoinFields> + UtxoTxGenerationOps> UtxoTxBuilder<'a, T> {
         for utxo in self.available_inputs.clone() {
             self.tx.inputs.push(UnsignedTransactionInput {
                 previous_output: utxo.outpoint,
-                prev_script: utxo.script.unwrap_or(Vec::new().into()),
+                prev_script: utxo.script,
                 sequence: SEQUENCE_FINAL,
                 amount: utxo.value,
                 witness: vec![],
@@ -1095,7 +1095,7 @@ impl<'a, T: AsRef<UtxoCoinFields> + UtxoTxGenerationOps> UtxoTxBuilder<'a, T> {
             } else {
                 self.tx.inputs.push(UnsignedTransactionInput {
                     previous_output: utxo.outpoint,
-                    prev_script: utxo.script.unwrap_or(Vec::new().into()),
+                    prev_script: utxo.script,
                     sequence: SEQUENCE_FINAL,
                     amount: utxo.value,
                     witness: vec![],
@@ -3033,7 +3033,7 @@ async fn get_unspents_for_inputs(
             value: sat_from_big_decimal(&prev_amount, coin.decimals)
                 .expect("Conversion to satoshi from bigdecimal must be valid"),
             height: None,
-            script: Some(prev_script),
+            script: prev_script,
         });
     }
     Ok(unspents_loaded)
@@ -3081,7 +3081,7 @@ async fn sign_raw_utxo_tx<T: AsRef<UtxoCoinFields> + UtxoTxGenerationOps>(
                 value: sat_from_big_decimal(&prev_utxo.amount, coin.as_ref().decimals)
                     .expect("conversion satoshi from bigdecimal must be valid"),
                 height: None,
-                script: Some(prev_script),
+                script: prev_script,
             });
         }
     }

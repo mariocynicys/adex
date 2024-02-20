@@ -457,7 +457,7 @@ impl SlpToken {
                 },
                 value: 0,
                 height: None,
-                script: Some(tx.outputs[SLP_SWAP_VOUT].script_pubkey.clone().into()),
+                script: tx.outputs[SLP_SWAP_VOUT].script_pubkey.clone().into(),
             },
             slp_amount: slp_satoshis,
         };
@@ -554,7 +554,7 @@ impl SlpToken {
                 },
                 value: tx.outputs[SLP_SWAP_VOUT].value,
                 height: None,
-                script: Some(tx.outputs[SLP_SWAP_VOUT].script_pubkey.clone().into()),
+                script: tx.outputs[SLP_SWAP_VOUT].script_pubkey.clone().into(),
             },
             slp_amount,
         };
@@ -606,7 +606,7 @@ impl SlpToken {
                 },
                 value: tx.outputs[SLP_SWAP_VOUT].value,
                 height: None,
-                script: Some(tx.outputs[SLP_SWAP_VOUT].script_pubkey.clone().into()),
+                script: tx.outputs[SLP_SWAP_VOUT].script_pubkey.clone().into(),
             },
             slp_amount,
         };

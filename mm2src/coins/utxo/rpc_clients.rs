@@ -256,11 +256,11 @@ pub struct UnspentInfo {
     /// Note None if the transaction is not mined yet.
     pub height: Option<u64>,
     /// The script pubkey of the UTXO
-    pub script: Option<Script>,
+    pub script: Script,
 }
 
 impl UnspentInfo {
-    fn from_electrum(unspent: ElectrumUnspent, script: Option<Script>) -> UnspentInfo {
+    fn from_electrum(unspent: ElectrumUnspent, script: Script) -> UnspentInfo {
         UnspentInfo {
             outpoint: OutPoint {
                 hash: unspent.tx_hash.reversed().into(),
@@ -280,7 +280,7 @@ impl UnspentInfo {
             },
             value: sat_from_big_decimal(&unspent.amount.to_decimal(), decimals)?,
             height,
-            script: Some(unspent.script_pub_key.0.into()),
+            script: unspent.script_pub_key.0.into(),
         })
     }
 }
@@ -2242,7 +2242,7 @@ impl UtxoRpcClientOps for ElectrumClient {
                 .flat_map(|(unspents, output_script)| {
                     unspents
                         .into_iter()
-                        .map(move |unspent| UnspentInfo::from_electrum(unspent, Some(output_script.clone())))
+                        .map(move |unspent| UnspentInfo::from_electrum(unspent, output_script.clone()))
                 })
                 .collect();
             Ok(unspents)
@@ -2271,7 +2271,7 @@ impl UtxoRpcClientOps for ElectrumClient {
                 .map(|(unspents, output_script)| {
                     unspents
                         .into_iter()
-                        .map(|unspent| UnspentInfo::from_electrum(unspent, Some(output_script.clone())))
+                        .map(|unspent| UnspentInfo::from_electrum(unspent, output_script.clone()))
                         .collect()
                 })
                 .collect();

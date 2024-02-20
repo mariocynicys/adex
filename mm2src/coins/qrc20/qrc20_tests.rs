@@ -108,10 +108,9 @@ fn test_withdraw_impl_fee_details() {
             },
             value: 1000000000,
             height: Default::default(),
-            script: Some(
-                coin.script_for_address(coin.as_ref().derivation_method.unwrap_single_addr())
-                    .unwrap(),
-            ),
+            script: coin
+                .script_for_address(coin.as_ref().derivation_method.unwrap_single_addr())
+                .unwrap(),
         }];
         MockResult::Return(Box::pin(futures::future::ok((unspents, cache))))
     });

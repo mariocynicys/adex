@@ -320,7 +320,7 @@ impl From<UnspentInfo> for CachedUnspentInfo {
         CachedUnspentInfo {
             outpoint: unspent.outpoint,
             value: unspent.value,
-            script: unspent.script,
+            script: Some(unspent.script),
         }
     }
 }
@@ -331,7 +331,7 @@ impl From<CachedUnspentInfo> for UnspentInfo {
             outpoint: cached.outpoint,
             value: cached.value,
             height: None,
-            script: cached.script,
+            script: cached.script.unwrap(),
         }
     }
 }
@@ -1896,7 +1896,7 @@ where
             outpoint: input.previous_output,
             value: input.amount,
             height: None,
-            script: Some(input.prev_script.clone()),
+            script: input.prev_script.clone(),
         })
         .collect();
 
