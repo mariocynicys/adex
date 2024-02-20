@@ -3115,10 +3115,6 @@ async fn sign_raw_utxo_tx<T: AsRef<UtxoCoinFields> + UtxoTxGenerationOps>(
     debug!("Unsigned tx = {:?} for signing", unsigned);
 
     let signature_version = coin.as_ref().conf.signature_version;
-    // let signature_version = match prev_script.is_pay_to_witness_key_hash() {
-    //     true => SignatureVersion::WitnessV0,
-    //     _ => coin.as_ref().conf.signature_version,
-    // };
     let tx_signed = sign_tx(unsigned, key_pair, signature_version, coin.as_ref().conf.fork_id)
         .map_err(|err| RawTransactionError::SigningError(err.to_string()))?;
 

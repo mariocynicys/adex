@@ -7,7 +7,7 @@ use keys::bytes::Bytes;
 use keys::KeyPair;
 use mm2_err_handle::prelude::*;
 use primitives::hash::H256;
-use script::{Builder, Script, SignatureVersion, TransactionInputSigner, UnsignedTransactionInput};
+use script::{Builder, Script, ScriptType, SignatureVersion, TransactionInputSigner, UnsignedTransactionInput};
 
 pub const SIGHASH_ALL: u32 = 1;
 pub const _SIGHASH_NONE: u32 = 2;
@@ -30,6 +30,11 @@ pub enum UtxoSignWithKeyPairError {
     },
     #[display(fmt = "Input index '{}' is out of bound. Total length = {}", index, len)]
     InputIndexOutOfBound { len: usize, index: usize },
+    #[display(
+        fmt = "Can't spend the UTXO with script = '{}'. This script format isn't supported",
+        script
+    )]
+    UnspendableUTXO { script: Script },
     #[display(fmt = "Error signing using a private key")]
     ErrorSigning(keys::Error),
 }
@@ -44,20 +49,22 @@ pub fn sign_tx(
     signature_version: SignatureVersion,
     fork_id: u32,
 ) -> UtxoSignWithKeyPairResult<UtxoTx> {
-    let mut signed_inputs = vec![];
-    match signature_version {
-        SignatureVersion::WitnessV0 => {
-            // TODO: just iter() instead of iter().enumerate()
-            for (i, _) in unsigned.inputs.iter().enumerate() {
-                signed_inputs.push(p2wpkh_spend(&unsigned, i, key_pair, signature_version, fork_id)?);
+    let signed_inputs = unsigned
+        .inputs
+        .iter()
+        .enumerate()
+        .map(|(i, input)| {
+            match input.prev_script.script_type() {
+                ScriptType::WitnessKey => p2wpkh_spend(&unsigned, i, key_pair, SignatureVersion::WitnessV0, fork_id),
+                ScriptType::PubKeyHash => p2pkh_spend(&unsigned, i, key_pair, signature_version, fork_id),
+                // All  ow spending legacy P2PK utxos.
+                ScriptType::PubKey => p2pk_spend(&unsigned, i, key_pair, signature_version, fork_id),
+                _ => MmError::err(UtxoSignWithKeyPairError::UnspendableUTXO {
+                    script: input.prev_script.clone(),
+                }),
             }
-        },
-        _ => {
-            for (i, _) in unsigned.inputs.iter().enumerate() {
-                signed_inputs.push(p2pkh_spend(&unsigned, i, key_pair, signature_version, fork_id)?);
-            }
-        },
-    }
+        })
+        .collect::<UtxoSignWithKeyPairResult<_>>()?;
     Ok(complete_tx(unsigned, signed_inputs))
 }
 
