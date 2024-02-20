@@ -453,11 +453,11 @@ impl SlpToken {
             bch_unspent: UnspentInfo {
                 outpoint: OutPoint {
                     hash: tx.hash(),
-                    index: 1,
+                    index: SLP_SWAP_VOUT as u32,
                 },
                 value: 0,
                 height: None,
-                script: None,
+                script: Some(tx.outputs[SLP_SWAP_VOUT].script_pubkey.clone().into()),
             },
             slp_amount: slp_satoshis,
         };
@@ -552,9 +552,9 @@ impl SlpToken {
                     hash: tx.hash(),
                     index: SLP_SWAP_VOUT as u32,
                 },
-                value: tx.outputs[1].value,
+                value: tx.outputs[SLP_SWAP_VOUT].value,
                 height: None,
-                script: None,
+                script: Some(tx.outputs[SLP_SWAP_VOUT].script_pubkey.clone().into()),
             },
             slp_amount,
         };
@@ -604,9 +604,9 @@ impl SlpToken {
                     hash: tx.hash(),
                     index: SLP_SWAP_VOUT as u32,
                 },
-                value: tx.outputs[1].value,
+                value: tx.outputs[SLP_SWAP_VOUT].value,
                 height: None,
-                script: None,
+                script: Some(tx.outputs[SLP_SWAP_VOUT].script_pubkey.clone().into()),
             },
             slp_amount,
         };

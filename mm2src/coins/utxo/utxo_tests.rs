@@ -195,7 +195,7 @@ fn test_generate_transaction() {
         value: 10000000000,
         outpoint: OutPoint::default(),
         height: Default::default(),
-        script: None,
+        script: Some(Vec::new().into()),
     }];
 
     let outputs = vec![TransactionOutput {
@@ -214,7 +214,7 @@ fn test_generate_transaction() {
         value: 100000,
         outpoint: OutPoint::default(),
         height: Default::default(),
-        script: None,
+        script: Some(Vec::new().into()),
     }];
 
     let outputs = vec![TransactionOutput {
@@ -239,7 +239,7 @@ fn test_generate_transaction() {
         value: 100000,
         outpoint: OutPoint::default(),
         height: Default::default(),
-        script: None,
+        script: Some(Vec::new().into()),
     }];
 
     let outputs = vec![TransactionOutput {
@@ -266,7 +266,7 @@ fn test_generate_transaction() {
         value: 100000,
         outpoint: OutPoint::default(),
         height: Default::default(),
-        script: None,
+        script: Some(Vec::new().into()),
     }];
 
     let outputs = vec![TransactionOutput {
@@ -1183,7 +1183,7 @@ fn test_generate_transaction_relay_fee_is_used_when_dynamic_fee_is_lower() {
         value: 1000000000,
         outpoint: OutPoint::default(),
         height: Default::default(),
-        script: None,
+        script: Some(Vec::new().into()),
     }];
 
     let outputs = vec![TransactionOutput {
@@ -1226,7 +1226,7 @@ fn test_generate_transaction_relay_fee_is_used_when_dynamic_fee_is_lower_and_ded
         value: 1000000000,
         outpoint: OutPoint::default(),
         height: Default::default(),
-        script: None,
+        script: Some(Vec::new().into()),
     }];
 
     let outputs = vec![TransactionOutput {
@@ -1273,7 +1273,7 @@ fn test_generate_tx_fee_is_correct_when_dynamic_fee_is_larger_than_relay() {
             value: 1000000000,
             outpoint: OutPoint::default(),
             height: Default::default(),
-            script: None,
+            script: Some(Vec::new().into()),
         };
         20
     ];
@@ -1804,7 +1804,7 @@ fn test_qtum_my_balance() {
                 },
                 value: 5000000000,
                 height: Default::default(),
-                script: None,
+                script: Some(Vec::new().into()),
             },
             UnspentInfo {
                 outpoint: OutPoint {
@@ -1813,7 +1813,7 @@ fn test_qtum_my_balance() {
                 },
                 value: 1600000000,
                 height: Default::default(),
-                script: None,
+                script: Some(Vec::new().into()),
             },
         ];
         // unspendable (2.0)
@@ -1824,7 +1824,7 @@ fn test_qtum_my_balance() {
             },
             value: 200000000,
             height: Default::default(),
-            script: None,
+            script: Some(Vec::new().into()),
         }];
         MockResult::Return(Box::pin(futures::future::ok((
             MatureUnspentList { mature, immature },
@@ -1915,7 +1915,7 @@ fn test_get_mature_unspent_ordered_map_from_cache_impl(
             },
             value: 1000000000,
             height: unspent_height,
-            script: None,
+            script: Some(Vec::new().into()),
         }];
         MockResult::Return(Box::new(futures01::future::ok(unspents)))
     });
@@ -2787,7 +2787,7 @@ fn test_generate_tx_doge_fee() {
         outpoint: Default::default(),
         value: 1000000000000,
         height: None,
-        script: None,
+        script: Some(Vec::new().into()),
     }];
     let outputs = vec![TransactionOutput {
         value: 100000000,
@@ -2804,7 +2804,7 @@ fn test_generate_tx_doge_fee() {
         outpoint: Default::default(),
         value: 1000000000000,
         height: None,
-        script: None,
+        script: Some(Vec::new().into()),
     }];
     let outputs = vec![
         TransactionOutput {
@@ -2825,7 +2825,7 @@ fn test_generate_tx_doge_fee() {
         outpoint: Default::default(),
         value: 1000000000000,
         height: None,
-        script: None,
+        script: Some(Vec::new().into()),
     }];
     let outputs = vec![
         TransactionOutput {
