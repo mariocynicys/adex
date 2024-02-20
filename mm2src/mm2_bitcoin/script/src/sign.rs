@@ -6,9 +6,10 @@ use chain::{JoinSplit, OutPoint, ShieldedOutput, ShieldedSpend, Transaction, Tra
             TxHashAlgo};
 use crypto::{dhash256, sha256};
 use hash::{H256, H512};
+use keys::KeyPair;
 use ser::Stream;
 use serde::Deserialize;
-use Script;
+use {Builder, Script};
 
 const ZCASH_PREVOUTS_HASH_PERSONALIZATION: &[u8] = b"ZcashPrevoutHash";
 const ZCASH_SEQUENCE_HASH_PERSONALIZATION: &[u8] = b"ZcashSequencHash";
@@ -230,26 +231,52 @@ impl From<TransactionInputSigner> for Transaction {
 impl TransactionInputSigner {
     pub fn signature_hash(
         &self,
-        unsigned_input: &UnsignedTransactionInput,
+        input_index: usize,
+        input_amount: u64,
         script_pubkey: &Script,
         sigversion: SignatureVersion,
         sighashtype: u32,
     ) -> H256 {
-        let Some(input_index) = self.inputs.iter().position(|input| input.previous_output == unsigned_input.previous_output) else {
-            return 1u8.into()
-        };
-
         let sighash = Sighash::from_u32(sigversion, sighashtype);
         match sigversion {
             SignatureVersion::ForkId if sighash.fork_id => {
-                self.signature_hash_fork_id(input_index, unsigned_input.amount, script_pubkey, sighashtype, sighash)
+                self.signature_hash_fork_id(input_index, input_amount, script_pubkey, sighashtype, sighash)
             },
             SignatureVersion::Base | SignatureVersion::ForkId => {
                 self.signature_hash_original(input_index, script_pubkey, sighashtype, sighash)
             },
             SignatureVersion::WitnessV0 => {
-                self.signature_hash_witness0(input_index, unsigned_input.amount, script_pubkey, sighashtype, sighash)
+                self.signature_hash_witness0(input_index, input_amount, script_pubkey, sighashtype, sighash)
             },
+        }
+    }
+
+    /// input_index - index of input to sign
+    /// script_pubkey - script_pubkey of input's previous_output pubkey
+    pub fn signed_input(
+        &self,
+        keypair: &KeyPair,
+        input_index: usize,
+        input_amount: u64,
+        script_pubkey: &Script,
+        sigversion: SignatureVersion,
+        sighash: u32,
+    ) -> TransactionInput {
+        let hash = self.signature_hash(input_index, input_amount, script_pubkey, sigversion, sighash);
+
+        let mut signature: Vec<u8> = keypair.private().sign(&hash).unwrap().into();
+        signature.push(sighash as u8);
+        let script_sig = Builder::default()
+            .push_data(&signature)
+            //.push_data(keypair.public())
+            .into_script();
+
+        let unsigned_input = &self.inputs[input_index];
+        TransactionInput {
+            previous_output: unsigned_input.previous_output,
+            sequence: unsigned_input.sequence,
+            script_sig: script_sig.to_bytes(),
+            script_witness: vec![],
         }
     }
 
@@ -667,12 +694,7 @@ mod tests {
             hash_algo: SignerHashAlgo::DSHA256,
         };
 
-        let hash = input_signer.signature_hash(
-            &input_signer.inputs[0],
-            &previous_output,
-            SignatureVersion::Base,
-            SighashBase::All.into(),
-        );
+        let hash = input_signer.signature_hash(0, 0, &previous_output, SignatureVersion::Base, SighashBase::All.into());
         assert_eq!(hash, expected_signature_hash);
     }
 
@@ -725,12 +747,7 @@ mod tests {
             hash_algo: SignerHashAlgo::DSHA256,
         };
 
-        let hash = input_signer.signature_hash(
-            &input_signer.inputs[0],
-            &previous_output,
-            SignatureVersion::Base,
-            SighashBase::All.into(),
-        );
+        let hash = input_signer.signature_hash(0, 0, &previous_output, SignatureVersion::Base, SighashBase::All.into());
         assert_eq!(hash, expected_signature_hash);
     }
 
@@ -801,7 +818,8 @@ mod tests {
         );
 
         let hash = signer.signature_hash(
-            &signer.inputs[0],
+            0,
+            0,
             &Script::from("1976a914507173527b4c3318a2aecd793bf1cfed705950cf88ac"),
             SignatureVersion::Base,
             1,
@@ -834,7 +852,8 @@ mod tests {
         );
 
         let hash = signer.signature_hash(
-            &signer.inputs[0],
+            0,
+            0,
             &Script::from("76a91405aab5342166f8594baf17a7d9bef5d56744332788ac"),
             SignatureVersion::Base,
             1,
@@ -867,8 +886,8 @@ mod tests {
         );
 
         let hash = signer.signature_hash(
-            &signer.inputs[0],
-
+			0,
+            0,
 			&Script::from("6304e5928060b17521031c632dad67a611de77d9666cbc61e65957c7d7544c25e384f4e76de729e6a1bfac6782012088a914b78f0b837e2c710f8b28e59d06473d489e5315c88821037310a8fb9fd8f198a1a21db830252ad681fccda580ed4101f3f6bfb98b34fab5ac68"),
 			SignatureVersion::Base,
             1
@@ -1032,11 +1051,12 @@ mod tests {
         ]);
         let tx: Transaction = deserialize(tx.as_slice()).unwrap();
         let mut signer = TransactionInputSigner::from(tx);
-        signer.inputs[input_index].amount = amount;
+        signer.inputs[0].amount = amount;
         signer.consensus_branch_id = consensus_branch_id;
 
         let sig_hash = signer.signature_hash(
-            &signer.inputs[input_index],
+            input_index,
+            amount,
             &script_code.into(),
             SignatureVersion::Base,
             hash_type,
@@ -1231,11 +1251,12 @@ mod tests {
 
         let tx: Transaction = deserialize(tx.as_slice()).unwrap();
         let mut signer = TransactionInputSigner::from(tx);
-        signer.inputs[input_index].amount = amount;
+        signer.inputs[1].amount = amount;
         signer.consensus_branch_id = consensus_branch_id;
 
         let sig_hash = signer.signature_hash(
-            &signer.inputs[input_index],
+            input_index,
+            amount,
             &script_code.into(),
             SignatureVersion::Base,
             hash_type,

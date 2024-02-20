@@ -658,7 +658,7 @@ impl SlpToken {
         let my_key_pair = self.platform_coin.as_ref().priv_key_policy.activated_key_or_err()?;
         let signed_p2sh_input = p2sh_spend(
             &unsigned,
-            &unsigned.inputs[0],
+            0,
             htlc_keypair,
             script_data,
             redeem_script,
@@ -674,7 +674,7 @@ impl SlpToken {
             .map(|(i, _)| {
                 p2pkh_spend(
                     &unsigned,
-                    &unsigned.inputs[i],
+                    i,
                     my_key_pair,
                     self.platform_coin.as_ref().conf.signature_version,
                     self.platform_coin.as_ref().conf.fork_id,
