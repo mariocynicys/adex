@@ -310,28 +310,26 @@ pub enum FeePolicy {
 pub struct CachedUnspentInfo {
     pub outpoint: OutPoint,
     pub value: u64,
-    // TODO: Remove this field. It's always gonna be `RecentlySpentOutPoints::for_script_pubkey`.
-    // This is viable since we have one and only one `for_script_pubkey`.
-    pub script: Option<Script>,
+    // DISCUSS: Should we have `pub height: Option<u64>` here?
+    // Currently cached UTXOs will not carry out the height information from `UtxoInfo`,
+    // thus will not be able to get it back when `to_unspent_info`.
+    // Do these cached utxo need to carry height information? what will their height be? (since they are probably unconfirmed utxos)
 }
 
-impl From<UnspentInfo> for CachedUnspentInfo {
-    fn from(unspent: UnspentInfo) -> CachedUnspentInfo {
+impl CachedUnspentInfo {
+    fn from_unspent_info(unspent: &UnspentInfo) -> CachedUnspentInfo {
         CachedUnspentInfo {
             outpoint: unspent.outpoint,
             value: unspent.value,
-            script: Some(unspent.script),
         }
     }
-}
 
-impl From<CachedUnspentInfo> for UnspentInfo {
-    fn from(cached: CachedUnspentInfo) -> UnspentInfo {
+    fn to_unspent_info(&self, script: Script) -> UnspentInfo {
         UnspentInfo {
-            outpoint: cached.outpoint,
-            value: cached.value,
+            outpoint: self.outpoint,
+            value: self.value,
             height: None,
-            script: cached.script.unwrap(),
+            script,
         }
     }
 }
@@ -358,23 +356,17 @@ impl RecentlySpentOutPoints {
     }
 
     pub fn add_spent(&mut self, inputs: Vec<UnspentInfo>, spend_tx_hash: H256, outputs: Vec<TransactionOutput>) {
-        let inputs: HashSet<_> = inputs.into_iter().map(From::from).collect();
+        let inputs: HashSet<_> = inputs.iter().map(CachedUnspentInfo::from_unspent_info).collect();
         let to_replace: HashSet<_> = outputs
             .into_iter()
             .enumerate()
-            .filter_map(|(index, output)| {
-                if output.script_pubkey == self.for_script_pubkey {
-                    Some(CachedUnspentInfo {
-                        outpoint: OutPoint {
-                            hash: spend_tx_hash,
-                            index: index as u32,
-                        },
-                        value: output.value,
-                        script: Some(output.script_pubkey.into()),
-                    })
-                } else {
-                    None
-                }
+            .filter(|(_, output)| output.script_pubkey == self.for_script_pubkey)
+            .map(|(index, output)| CachedUnspentInfo {
+                outpoint: OutPoint {
+                    hash: spend_tx_hash,
+                    index: index as u32,
+                },
+                value: output.value,
             })
             .collect();
 
@@ -409,13 +401,14 @@ impl RecentlySpentOutPoints {
     pub fn replace_spent_outputs_with_cache(&self, mut outputs: HashSet<UnspentInfo>) -> HashSet<UnspentInfo> {
         let mut replacement_unspents = HashSet::new();
         outputs.retain(|unspent| {
-            let outs = self.input_to_output_map.get(&unspent.clone().into());
+            let outs = self
+                .input_to_output_map
+                .get(&CachedUnspentInfo::from_unspent_info(unspent));
+
             match outs {
                 Some(outs) => {
-                    for out in outs.iter() {
-                        if !replacement_unspents.contains(out) {
-                            replacement_unspents.insert(out.clone());
-                        }
+                    for out in outs {
+                        replacement_unspents.insert(out.clone());
                     }
                     false
                 },
@@ -425,7 +418,11 @@ impl RecentlySpentOutPoints {
         if replacement_unspents.is_empty() {
             return outputs;
         }
-        outputs.extend(replacement_unspents.into_iter().map(From::from));
+        outputs.extend(
+            replacement_unspents
+                .iter()
+                .map(|cached| cached.to_unspent_info(self.for_script_pubkey.clone().into())),
+        );
         self.replace_spent_outputs_with_cache(outputs)
     }
 }
