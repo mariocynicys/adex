@@ -46,9 +46,8 @@ impl SignatureChecker for TransactionSignatureChecker {
         sighashtype: u32,
         version: SignatureVersion,
     ) -> bool {
-        let hash = self
-            .signer
-            .signature_hash(self.input_index, self.input_amount, script_code, version, sighashtype);
+        let input = &self.signer.inputs[self.input_index];
+        let hash = self.signer.signature_hash(input, script_code, version, sighashtype);
         public.verify(&hash, signature).unwrap_or(false)
     }
 

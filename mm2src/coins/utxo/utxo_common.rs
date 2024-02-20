@@ -1270,7 +1270,7 @@ pub async fn p2sh_spending_tx<T: UtxoCommonOps>(coin: &T, input: P2SHSpendingTxI
     );
     let signed_input = try_s!(p2sh_spend(
         &unsigned,
-        DEFAULT_SWAP_VOUT,
+        &unsigned.inputs[DEFAULT_SWAP_VOUT],
         input.keypair,
         input.script_data,
         input.redeem_script.into(),
@@ -1380,7 +1380,7 @@ pub async fn gen_and_sign_taker_funding_spend_preimage<T: UtxoCommonOps>(
     );
     let signature = calc_and_sign_sighash(
         &preimage,
-        DEFAULT_SWAP_VOUT,
+        &preimage.inputs[DEFAULT_SWAP_VOUT],
         &redeem_script,
         htlc_keypair,
         coin.as_ref().conf.signature_version,
@@ -1454,12 +1454,12 @@ pub async fn validate_taker_funding_spend_preimage<T: UtxoCommonOps + SwapOps>(
     );
     let sig_hash = signature_hash_to_sign(
         &expected_preimage,
-        DEFAULT_SWAP_VOUT,
+        &expected_preimage.inputs[DEFAULT_SWAP_VOUT],
         &redeem_script,
         coin.as_ref().conf.signature_version,
         SIGHASH_ALL,
         coin.as_ref().conf.fork_id,
-    )?;
+    );
 
     if !gen_args
         .maker_pub
@@ -1499,7 +1499,7 @@ pub async fn sign_and_send_taker_funding_spend<T: UtxoCommonOps>(
 
     let taker_signature = try_tx_s!(calc_and_sign_sighash(
         &signer,
-        DEFAULT_SWAP_VOUT,
+        &signer.inputs[DEFAULT_SWAP_VOUT],
         &redeem_script,
         htlc_keypair,
         coin.as_ref().conf.signature_version,
@@ -1605,7 +1605,7 @@ pub async fn gen_and_sign_taker_payment_spend_preimage<T: UtxoCommonOps>(
         swap_proto_v2_scripts::taker_payment_script(time_lock, args.secret_hash, args.taker_pub, args.maker_pub);
     let signature = calc_and_sign_sighash(
         &preimage,
-        DEFAULT_SWAP_VOUT,
+        &preimage.inputs[DEFAULT_SWAP_VOUT],
         &redeem_script,
         htlc_keypair,
         coin.as_ref().conf.signature_version,
@@ -1642,12 +1642,12 @@ pub async fn validate_taker_payment_spend_preimage<T: UtxoCommonOps + SwapOps>(
     );
     let sig_hash = signature_hash_to_sign(
         &expected_preimage,
-        DEFAULT_SWAP_VOUT,
+        &expected_preimage.inputs[DEFAULT_SWAP_VOUT],
         &redeem_script,
         coin.as_ref().conf.signature_version,
         SIGHASH_SINGLE,
         coin.as_ref().conf.fork_id,
-    )?;
+    );
 
     if !gen_args
         .taker_pub
@@ -1710,7 +1710,7 @@ pub async fn sign_and_broadcast_taker_payment_spend<T: UtxoCommonOps>(
 
     let maker_signature = try_tx_s!(calc_and_sign_sighash(
         &signer,
-        DEFAULT_SWAP_VOUT,
+        &signer.inputs[DEFAULT_SWAP_VOUT],
         &redeem_script,
         htlc_keypair,
         coin.as_ref().conf.signature_version,

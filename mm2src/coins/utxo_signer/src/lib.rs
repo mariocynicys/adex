@@ -72,7 +72,6 @@ impl From<TrezorError> for UtxoSignTxError {
 
 impl From<UtxoSignWithKeyPairError> for UtxoSignTxError {
     fn from(error_with_key: UtxoSignWithKeyPairError) -> Self {
-        let error = error_with_key.to_string();
         match error_with_key {
             UtxoSignWithKeyPairError::MismatchScript {
                 script_type,
@@ -83,10 +82,6 @@ impl From<UtxoSignWithKeyPairError> for UtxoSignTxError {
                 script,
                 prev_script,
             },
-            // `with_key_pair` contains methods that checks parameters
-            // that are expected to be checked by [`sign_common::UtxoSignTxParamsBuilder::build`] already.
-            // So if this error happens, it's our internal error.
-            UtxoSignWithKeyPairError::InputIndexOutOfBound { .. } => UtxoSignTxError::Internal(error),
             UtxoSignWithKeyPairError::UnspendableUTXO { script } => UtxoSignTxError::UnspendableUTXO { script },
             UtxoSignWithKeyPairError::ErrorSigning(sign) => UtxoSignTxError::ErrorSigning(sign),
         }
