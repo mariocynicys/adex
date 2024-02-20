@@ -400,7 +400,6 @@ impl SlpToken {
             outputs,
         };
         Ok((preimage, recently_spent))
-        //////////////////////////////////////////////////
     }
 
     pub async fn send_slp_outputs(&self, slp_outputs: Vec<SlpOutput>) -> Result<UtxoTx, TransactionErr> {

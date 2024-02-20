@@ -78,10 +78,6 @@ pub fn p2pk_spend(
 ) -> UtxoSignWithKeyPairResult<TransactionInput> {
     let unsigned_input = get_input(signer, input_index)?;
 
-    // DISCUSS: Why are we doing this check? Solely to check whether we are spending
-    // a UTXO owned by us and not someone else? Or to make sure we are not signing another
-    // transaction type (not p2pk)?
-    // I think none should ever happen!
     let script = Builder::build_p2pk(key_pair.public());
     if script != unsigned_input.prev_script {
         return MmError::err(UtxoSignWithKeyPairError::MismatchScript {

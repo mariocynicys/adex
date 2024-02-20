@@ -2220,8 +2220,7 @@ impl ElectrumClient {
 #[cfg_attr(test, mockable)]
 impl UtxoRpcClientOps for ElectrumClient {
     fn list_unspent(&self, address: &Address, _decimals: u8) -> UtxoRpcFut<Vec<UnspentInfo>> {
-        let output_script = try_f!(output_script(address));
-        let mut output_scripts = vec![output_script];
+        let mut output_scripts = vec![try_f!(output_script(address))];
 
         // If the plain pubkey is available, fetch the UTXOs found in P2PK outputs as well (if any).
         if let Some(pubkey) = address.pubkey() {
