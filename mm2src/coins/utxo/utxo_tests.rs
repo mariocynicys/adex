@@ -3118,6 +3118,29 @@ fn tbch_electroncash_verbose_tx_unconfirmed() {
 
 #[test]
 #[cfg(not(target_arch = "wasm32"))]
+fn test_withdraw_to_p2pk_fails() {
+    let client = NativeClient(Arc::new(NativeClientImpl::default()));
+
+    let coin = utxo_coin_for_test(UtxoRpcClientEnum::Native(client), None, false);
+
+    let withdraw_req = WithdrawRequest {
+        amount: 1.into(),
+        from: None,
+        to: "03f8f8fa2062590ba9a0a7a86f937de22f540c015864aad35a2a9f6766de906265".to_string(),
+        coin: TEST_COIN_NAME.into(),
+        max: false,
+        fee: None,
+        memo: None,
+    };
+
+    assert!(matches!(
+        coin.withdraw(withdraw_req).wait().unwrap_err().into_inner(),
+        WithdrawError::InvalidAddress(..)
+    ))
+}
+
+#[test]
+#[cfg(not(target_arch = "wasm32"))]
 fn test_withdraw_to_p2pkh() {
     let client = NativeClient(Arc::new(NativeClientImpl::default()));
 
@@ -3270,6 +3293,54 @@ fn test_withdraw_to_p2wpkh() {
     let expected_script = Builder::build_p2wpkh(p2wpkh_address.hash()).expect("valid p2wpkh script");
 
     assert_eq!(output_script, expected_script);
+}
+
+#[test]
+#[cfg(not(target_arch = "wasm32"))]
+fn test_withdraw_p2pk_balance() {
+    let client = NativeClient(Arc::new(NativeClientImpl::default()));
+
+    let coin = utxo_coin_for_test(UtxoRpcClientEnum::Native(client), None, false);
+
+    UtxoStandardCoin::get_unspent_ordered_list.mock_safe(|coin, _| {
+        let cache = block_on(coin.as_ref().recently_spent_outpoints.lock());
+        let unspents = vec![
+            UnspentInfo {
+                outpoint: OutPoint {
+                    hash: 1.into(),
+                    index: 0,
+                },
+                value: 1000000000,
+                height: Default::default(),
+                // Use a p2pk output script for this UTXO
+                script: output_script_p2pk(&coin.as_ref().derivation_method.unwrap_single_addr().pubkey().unwrap()),
+            },
+        ];
+        MockResult::Return(Box::pin(futures::future::ok((unspents, cache))))
+    });
+
+    // Create a dummy p2pkh address to withdraw the coins to.
+    let my_p2pkh_address = coin.as_ref().derivation_method.unwrap_single_addr().clone();
+
+    let withdraw_req = WithdrawRequest {
+        amount: 1.into(),
+        from: None,
+        to: my_p2pkh_address.to_string(),
+        coin: TEST_COIN_NAME.into(),
+        max: false,
+        fee: None,
+        memo: None,
+    };
+    let tx_details = coin.withdraw(withdraw_req).wait().unwrap();
+    let transaction: UtxoTx = deserialize(tx_details.tx_hex.as_slice()).unwrap();
+
+    // The change should be in a p2pkh script.
+    let output_script: Script = transaction.outputs[1].script_pubkey.clone().into();
+    let expected_script = Builder::build_p2pkh(my_p2pkh_address.hash());
+    assert_eq!(output_script, expected_script);
+
+    // And it should have this value (p2pk balance - amount sent - fees).
+    assert_eq!(transaction.outputs[1].value, 899999000);
 }
 
 /// `UtxoStandardCoin` has to check UTXO maturity if `check_utxo_maturity` is `true`.
