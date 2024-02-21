@@ -768,11 +768,10 @@ impl UtxoRpcClientOps for NativeClient {
             .list_unspent_impl(0, std::i32::MAX, vec![address.to_string()])
             .map_to_mm_fut(UtxoRpcError::from)
             .and_then(move |unspents| {
-                let unspents: UtxoRpcResult<Vec<_>> = unspents
+                unspents
                     .into_iter()
                     .map(|unspent| Ok(UnspentInfo::from_native(unspent, decimals, None)?))
-                    .collect();
-                unspents
+                    .collect::<UtxoRpcResult<_>>()
             });
         Box::new(fut)
     }

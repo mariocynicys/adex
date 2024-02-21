@@ -57,7 +57,7 @@ pub fn sign_tx(
             match input.prev_script.script_type() {
                 ScriptType::WitnessKey => p2wpkh_spend(&unsigned, i, key_pair, SignatureVersion::WitnessV0, fork_id),
                 ScriptType::PubKeyHash => p2pkh_spend(&unsigned, i, key_pair, signature_version, fork_id),
-                // All  ow spending legacy P2PK utxos.
+                // Allow spending legacy P2PK utxos.
                 ScriptType::PubKey => p2pk_spend(&unsigned, i, key_pair, signature_version, fork_id),
                 _ => MmError::err(UtxoSignWithKeyPairError::UnspendableUTXO {
                     script: input.prev_script.clone(),
