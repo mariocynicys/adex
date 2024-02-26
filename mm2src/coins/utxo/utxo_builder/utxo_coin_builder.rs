@@ -239,7 +239,7 @@ where
         conf.address_prefixes.clone(),
         conf.bech32_hrp.clone(),
     )
-    .as_pkh_from_pk(key_pair.public())
+    .as_pkh_from_pk(*key_pair.public())
     .build()
     .map_to_mm(UtxoCoinBuildError::Internal)?;
 

@@ -460,7 +460,7 @@ where
                     coin.as_ref().conf.address_prefixes.clone(),
                     coin.as_ref().conf.bech32_hrp.clone(),
                 )
-                .as_pkh_from_pk(key_pair.public())
+                .as_pkh_from_pk(*key_pair.public())
                 .build()
                 .map_to_mm(WithdrawError::InternalError)?;
                 (key_pair, my_address)

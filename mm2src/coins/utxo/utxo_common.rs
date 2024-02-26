@@ -4549,19 +4549,19 @@ pub fn address_from_raw_pubkey(
     addr_format: UtxoAddressFormat,
 ) -> Result<Address, String> {
     AddressBuilder::new(addr_format, checksum_type, prefixes, hrp)
-        .as_pkh_from_pk(&try_s!(Public::from_slice(pub_key)))
+        .as_pkh_from_pk(try_s!(Public::from_slice(pub_key)))
         .build()
 }
 
 pub fn address_from_pubkey(
-    pub_key: &Public,
+    pubkey: &Public,
     prefixes: NetworkAddressPrefixes,
     checksum_type: ChecksumType,
     hrp: Option<String>,
     addr_format: UtxoAddressFormat,
 ) -> Address {
     AddressBuilder::new(addr_format, checksum_type, prefixes, hrp)
-        .as_pkh_from_pk(pub_key)
+        .as_pkh_from_pk(*pubkey)
         .build()
         .expect("valid address props")
 }
