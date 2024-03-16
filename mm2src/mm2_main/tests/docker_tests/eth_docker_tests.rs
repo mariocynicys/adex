@@ -1,6 +1,6 @@
 use crate::docker_tests::docker_tests_common::{random_secp256k1_secret, GETH_ACCOUNT, GETH_ERC20_CONTRACT,
-                                               GETH_NONCE_LOCK, GETH_SWAP_CONTRACT, GETH_WATCHERS_SWAP_CONTRACT,
-                                               GETH_WEB3, MM_CTX};
+                                               GETH_NONCE_LOCK, GETH_RPC_URL, GETH_SWAP_CONTRACT,
+                                               GETH_WATCHERS_SWAP_CONTRACT, GETH_WEB3, MM_CTX};
 use bitcrypto::dhash160;
 use coins::eth::{checksum_address, eth_coin_from_conf_and_request, EthCoin, ERC20_ABI};
 use coins::{CoinProtocol, ConfirmPaymentInput, FoundSwapTxSpend, MarketCoinOps, PrivKeyBuildPolicy, RefundPaymentArgs,
@@ -87,12 +87,12 @@ fn fill_erc20(to_addr: Address, amount: U256) {
 }
 
 /// Creates ETH protocol coin supplied with 100 ETH
-pub fn eth_coin_with_random_privkey(swap_contract: Address) -> EthCoin {
+pub fn eth_coin_with_random_privkey_using_urls(swap_contract: Address, urls: &[&str]) -> EthCoin {
     let eth_conf = eth_dev_conf();
     let req = json!({
         "method": "enable",
         "coin": "ETH",
-        "urls": ["http://127.0.0.1:8545"],
+        "urls": urls,
         "swap_contract_address": swap_contract,
     });
 
@@ -113,13 +113,17 @@ pub fn eth_coin_with_random_privkey(swap_contract: Address) -> EthCoin {
     eth_coin
 }
 
+pub fn eth_coin_with_random_privkey(swap_contract: Address) -> EthCoin {
+    eth_coin_with_random_privkey_using_urls(swap_contract, &[GETH_RPC_URL])
+}
+
 /// Creates ERC20 protocol coin supplied with 1 ETH and 100 token
 pub fn erc20_coin_with_random_privkey(swap_contract: Address) -> EthCoin {
     let erc20_conf = erc20_dev_conf(&erc20_contract_checksum());
     let req = json!({
         "method": "enable",
         "coin": "ERC20DEV",
-        "urls": ["http://127.0.0.1:8545"],
+        "urls": [GETH_RPC_URL],
         "swap_contract_address": swap_contract,
     });
 
@@ -447,4 +451,35 @@ fn send_and_spend_erc20_maker_payment() {
 
     let expected = FoundSwapTxSpend::Spent(payment_spend);
     assert_eq!(expected, search_tx);
+}
+
+#[test]
+fn test_nonce_several_urls() {
+    // Use one working and one failing URL.
+    let coin = eth_coin_with_random_privkey_using_urls(swap_contract, &[GETH_RPC_URL, "http://127.0.0.1:0"]);
+    let (old_nonce, _) = coin.clone().get_addr_nonce(coin.my_address).wait().unwrap();
+
+    // Send a payment to increase the nonce.
+    coin.send_to_address(coin.my_address, 200000000.into()).wait().unwrap();
+
+    let (new_nonce, _) = coin.clone().get_addr_nonce(coin.my_address).wait().unwrap();
+    assert_eq!(old_nonce + 1, new_nonce);
+}
+
+#[test]
+fn test_nonce_lock() {
+    use crate::common::Future01CompatExt;
+    use futures::future::join_all;
+    use mm2_test_helpers::for_tests::wait_for_log;
+
+    let coin = eth_coin_with_random_privkey(swap_contract());
+    let futures = (0..5).map(|_| coin.send_to_address(coin.my_address, 200000000.into()).compat());
+    let results = block_on(join_all(futures));
+
+    // make sure all transactions are successful
+    for result in results {
+        result.unwrap();
+    }
+
+    block_on(wait_for_log(&MM_CTX, 1.1, |line| line.contains("get_addr_nonce…"))).unwrap();
 }
