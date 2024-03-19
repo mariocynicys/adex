@@ -6,6 +6,7 @@ use coins::eth::{checksum_address, eth_coin_from_conf_and_request, EthCoin, ERC2
 use coins::{CoinProtocol, ConfirmPaymentInput, FoundSwapTxSpend, MarketCoinOps, PrivKeyBuildPolicy, RefundPaymentArgs,
             SearchForSwapTxSpendInput, SendPaymentArgs, SpendPaymentArgs, SwapOps, SwapTxTypeWithSecretHash};
 use common::{block_on, now_sec};
+use crypto::Secp256k1Secret;
 use ethereum_types::U256;
 use futures01::Future;
 use mm2_test_helpers::for_tests::{erc20_dev_conf, eth_dev_conf};
@@ -113,6 +114,7 @@ pub fn eth_coin_with_random_privkey_using_urls(swap_contract: Address, urls: &[&
     eth_coin
 }
 
+/// Creates ETH protocol coin supplied with 100 ETH, using the default GETH_RPC_URL
 pub fn eth_coin_with_random_privkey(swap_contract: Address) -> EthCoin {
     eth_coin_with_random_privkey_using_urls(swap_contract, &[GETH_RPC_URL])
 }
@@ -146,6 +148,54 @@ pub fn erc20_coin_with_random_privkey(swap_contract: Address) -> EthCoin {
     fill_erc20(erc20_coin.my_address, U256::from(10000000000u64));
 
     erc20_coin
+}
+
+/// Fills the private key's public address with ETH and ERC20 tokens
+pub fn fill_eth_erc20_with_private_key(priv_key: Secp256k1Secret) {
+    let eth_conf = eth_dev_conf();
+    let req = json!({
+        "method": "enable",
+        "coin": "ETH",
+        "urls": [GETH_RPC_URL],
+        "swap_contract_address": swap_contract(),
+    });
+
+    let eth_coin = block_on(eth_coin_from_conf_and_request(
+        &MM_CTX,
+        "ETH",
+        &eth_conf,
+        &req,
+        CoinProtocol::ETH,
+        PrivKeyBuildPolicy::IguanaPrivKey(priv_key),
+    ))
+    .unwrap();
+
+    // 100 ETH
+    fill_eth(eth_coin.my_address, U256::from(10).pow(U256::from(20)));
+
+    let erc20_conf = erc20_dev_conf(&erc20_contract_checksum());
+    let req = json!({
+        "method": "enable",
+        "coin": "ERC20DEV",
+        "urls": [GETH_RPC_URL],
+        "swap_contract_address": swap_contract(),
+    });
+
+    let erc20_coin = block_on(eth_coin_from_conf_and_request(
+        &MM_CTX,
+        "ERC20DEV",
+        &erc20_conf,
+        &req,
+        CoinProtocol::ERC20 {
+            platform: "ETH".to_string(),
+            contract_address: erc20_contract_checksum(),
+        },
+        PrivKeyBuildPolicy::IguanaPrivKey(priv_key),
+    ))
+    .unwrap();
+
+    // 100 tokens (it has 8 decimals)
+    fill_erc20(erc20_coin.my_address, U256::from(10000000000u64));
 }
 
 #[test]
