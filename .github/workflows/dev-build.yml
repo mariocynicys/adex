@@ -13,6 +13,7 @@ env:
   MANUAL_MM_VERSION: true
   JEMALLOC_SYS_WITH_MALLOC_CONF: "background_thread:true,narenas:1,tcache:false,dirty_decay_ms:0,muzzy_decay_ms:0,metadata_thp:auto"
   FILE_SERVER_AVAILABLE: ${{ secrets.FILE_SERVER_KEY != '' }}
+  FILE_SERVER_AVAIL: ${{ secrets.FILE_SERVER_KEY }}
 
 jobs:
   linux-x86-64:
@@ -57,7 +58,7 @@ jobs:
           cargo build --bin mm2 --release
 
       - name: Compress build output
-        if: env.FILE_SERVER_AVAILABLE
+        if: ${{ env.FILE_SERVER_AVAILABLE }}
         run: |
           NAME="mm2_$COMMIT_HASH-linux-x86-64.zip"
           zip $NAME target/release/mm2 -j
@@ -120,7 +121,7 @@ jobs:
           cargo build --bin mm2 --release --target x86_64-apple-darwin
 
       - name: Compress build output
-        if: env.FILE_SERVER_AVAILABLE
+        if: ${{ env.FILE_SERVER_AVAIL != '' }}
         run: |
           NAME="mm2_$COMMIT_HASH-mac-x86-64.zip"
           zip $NAME target/x86_64-apple-darwin/release/mm2 -j
@@ -289,7 +290,7 @@ jobs:
           wasm-pack build --release mm2src/mm2_bin_lib --target web --out-dir ../../target/target-wasm-release
 
       - name: Compress build output
-        if: env.FILE_SERVER_AVAILABLE
+        if: env.FILE_SERVER_AVAIL != ''
         run: |
           NAME="mm2_$COMMIT_HASH-wasm.zip"
           (cd ./target/target-wasm-release && zip -r - .) > $NAME
