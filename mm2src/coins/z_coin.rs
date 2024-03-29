@@ -1,3 +1,12 @@
+pub mod storage;
+mod z_balance_streaming;
+mod z_coin_errors;
+#[cfg(all(test, feature = "zhtlc-native-tests"))]
+mod z_coin_native_tests;
+mod z_htlc;
+mod z_rpc;
+mod z_tx_history;
+
 use crate::coin_errors::{MyAddressError, ValidatePaymentResult};
 use crate::my_tx_history_v2::{MyTxHistoryErrorV2, MyTxHistoryRequestV2, MyTxHistoryResponseV2};
 use crate::rpc_command::init_withdraw::{InitWithdrawCoin, WithdrawInProgressStatus, WithdrawTaskHandleShared};
@@ -14,6 +23,7 @@ use crate::utxo::{sat_from_big_decimal, utxo_common, ActualTxFee, AdditionalTxDa
                   UtxoCommonOps, UtxoRpcMode, UtxoTxBroadcastOps, UtxoTxGenerationOps, VerboseTransactionFrom};
 use crate::utxo::{UnsupportedAddr, UtxoFeeDetails};
 use crate::z_coin::storage::{BlockDbImpl, WalletDbShared};
+use crate::z_coin::z_balance_streaming::ZBalanceEventHandler;
 use crate::z_coin::z_tx_history::{fetch_tx_history_from_db, ZCoinTxHistoryItem};
 use crate::{BalanceError, BalanceFut, CheckIfMyPaymentSentArgs, CoinBalance, CoinFutSpawner, ConfirmPaymentInput,
             DexFee, FeeApproxStage, FoundSwapTxSpend, HistorySyncState, MakerSwapTakerCoin, MarketCoinOps, MmCoin,
@@ -48,6 +58,7 @@ use keys::hash::H256;
 use keys::{KeyPair, Message, Public};
 use mm2_core::mm_ctx::MmArc;
 use mm2_err_handle::prelude::*;
+use mm2_event_stream::behaviour::{EventBehaviour, EventInitStatus};
 use mm2_number::{BigDecimal, MmNumber};
 #[cfg(test)] use mocktopus::macros::*;
 use primitives::bytes::Bytes;
@@ -60,8 +71,10 @@ use std::convert::TryInto;
 use std::iter;
 use std::path::PathBuf;
 use std::sync::Arc;
-#[cfg(target_arch = "wasm32")]
-use z_coin_errors::ZCoinBalanceError;
+pub use z_coin_errors::*;
+use z_htlc::{z_p2sh_spend, z_send_dex_fee, z_send_htlc};
+use z_rpc::init_light_client;
+pub use z_rpc::{FirstSyncBlock, SyncStatus};
 use z_rpc::{SaplingSyncConnector, SaplingSyncGuard};
 use zcash_client_backend::encoding::{decode_payment_address, encode_extended_spending_key, encode_payment_address};
 use zcash_client_backend::wallet::{AccountId, SpendableNote};
@@ -78,13 +91,6 @@ use zcash_primitives::{constants::mainnet as z_mainnet_constants, sapling::Payme
                        zip32::ExtendedFullViewingKey, zip32::ExtendedSpendingKey};
 use zcash_proofs::prover::LocalTxProver;
 
-mod z_htlc;
-use z_htlc::{z_p2sh_spend, z_send_dex_fee, z_send_htlc};
-
-mod z_rpc;
-use z_rpc::init_light_client;
-pub use z_rpc::{FirstSyncBlock, SyncStatus};
-
 cfg_native!(
     use common::{async_blocking, sha256_digest};
     use zcash_client_sqlite::error::SqliteClientError as ZcashClientError;
@@ -94,21 +100,13 @@ cfg_native!(
 );
 
 cfg_wasm32!(
-    use crate::z_coin::z_params::ZcashParamsWasmImpl;
+    use crate::z_coin::storage::ZcashParamsWasmImpl;
     use common::executor::AbortOnDropHandle;
     use futures::channel::oneshot;
     use rand::rngs::OsRng;
     use zcash_primitives::transaction::builder::TransactionMetadata;
+    use z_coin_errors::ZCoinBalanceError;
 );
-
-#[allow(unused)] mod z_coin_errors;
-pub use z_coin_errors::*;
-
-pub mod storage;
-#[cfg(all(test, feature = "zhtlc-native-tests"))]
-mod z_coin_native_tests;
-#[cfg(target_arch = "wasm32")] mod z_params;
-mod z_tx_history;
 
 /// `ZP2SHSpendError` compatible `TransactionErr` handling macro.
 macro_rules! try_ztx_s {
@@ -209,6 +207,7 @@ pub struct ZCoinFields {
     light_wallet_db: WalletDbShared,
     consensus_params: ZcoinConsensusParams,
     sync_state_connector: AsyncMutex<SaplingSyncConnector>,
+    z_balance_event_handler: Option<ZBalanceEventHandler>,
 }
 
 impl Transaction for ZTransaction {
@@ -654,6 +653,17 @@ impl ZCoin {
             paging_options: request.paging_options,
         })
     }
+
+    async fn spawn_balance_stream_if_enabled(&self, ctx: &MmArc) -> Result<(), String> {
+        let coin = self.clone();
+        if let Some(stream_config) = &ctx.event_stream_configuration {
+            if let EventInitStatus::Failed(err) = EventBehaviour::spawn_if_active(coin, stream_config).await {
+                return ERR!("Failed spawning zcoin balance event with error: {}", err);
+            }
+        }
+
+        Ok(())
+    }
 }
 
 impl AsRef<UtxoCoinFields> for ZCoin {
@@ -875,10 +885,24 @@ impl<'a> UtxoCoinBuilder for ZCoinBuilder<'a> {
         );
 
         let blocks_db = self.init_blocks_db().await?;
+        let (z_balance_event_sender, z_balance_event_handler) = if self.ctx.event_stream_configuration.is_some() {
+            let (sender, receiver) = futures::channel::mpsc::unbounded();
+            (Some(sender), Some(Arc::new(AsyncMutex::new(receiver))))
+        } else {
+            (None, None)
+        };
+
         let (sync_state_connector, light_wallet_db) = match &self.z_coin_params.mode {
             #[cfg(not(target_arch = "wasm32"))]
             ZcoinRpcMode::Native => {
-                init_native_client(&self, self.native_client()?, blocks_db, &z_spending_key).await?
+                init_native_client(
+                    &self,
+                    self.native_client()?,
+                    blocks_db,
+                    &z_spending_key,
+                    z_balance_event_sender,
+                )
+                .await?
             },
             ZcoinRpcMode::Light {
                 light_wallet_d_servers,
@@ -893,11 +917,13 @@ impl<'a> UtxoCoinBuilder for ZCoinBuilder<'a> {
                     sync_params,
                     skip_sync_params.unwrap_or_default(),
                     &z_spending_key,
+                    z_balance_event_sender,
                 )
                 .await?
             },
         };
-        let z_fields = ZCoinFields {
+
+        let z_fields = Arc::new(ZCoinFields {
             dex_fee_addr,
             my_z_addr,
             my_z_addr_encoded,
@@ -907,12 +933,16 @@ impl<'a> UtxoCoinBuilder for ZCoinBuilder<'a> {
             light_wallet_db,
             consensus_params: self.protocol_info.consensus_params,
             sync_state_connector,
-        };
+            z_balance_event_handler,
+        });
 
-        Ok(ZCoin {
-            utxo_arc,
-            z_fields: Arc::new(z_fields),
-        })
+        let zcoin = ZCoin { utxo_arc, z_fields };
+        zcoin
+            .spawn_balance_stream_if_enabled(self.ctx)
+            .await
+            .map_to_mm(ZCoinBuildError::FailedSpawningBalanceEvents)?;
+
+        Ok(zcoin)
     }
 }
 
