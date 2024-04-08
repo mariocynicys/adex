@@ -420,7 +420,6 @@ impl Script {
                     _ => unreachable!(), // because we are relying on script_type() checks here
                 })
                 .map(|public| {
-                    // DISCUSS: Should we really reduce this to pkh? what is it used for?
                     vec![ScriptAddress::new_p2pkh(AddressHashEnum::AddressHash(
                         public.address_hash(),
                     ))]

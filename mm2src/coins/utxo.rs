@@ -310,10 +310,6 @@ pub enum FeePolicy {
 pub struct CachedUnspentInfo {
     pub outpoint: OutPoint,
     pub value: u64,
-    // DISCUSS: Should we have `pub height: Option<u64>` here?
-    // Currently cached UTXOs will not carry out the height information from `UtxoInfo`,
-    // thus will not be able to get it back when `to_unspent_info`.
-    // Do these cached utxo need to carry height information? what will their height be? (since they are probably unconfirmed utxos)
 }
 
 impl CachedUnspentInfo {
