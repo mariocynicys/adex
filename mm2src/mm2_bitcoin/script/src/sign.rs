@@ -112,7 +112,6 @@ impl From<TransactionInput> for UnsignedTransactionInput {
     fn from(i: TransactionInput) -> Self {
         UnsignedTransactionInput {
             previous_output: i.previous_output,
-            // DISCUSS: Would setting dummy script like this have any implications?
             prev_script: Vec::new().into(),
             sequence: i.sequence,
             amount: 0,
@@ -210,7 +209,6 @@ impl From<TransactionInputSigner> for Transaction {
                     previous_output: input.previous_output,
                     script_sig: vec![].into(),
                     sequence: input.sequence,
-                    // FIXME: Why not add the witness from the unsigned transaction input? optimization?
                     script_witness: vec![],
                 })
                 .collect(),
