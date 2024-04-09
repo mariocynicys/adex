@@ -2173,8 +2173,7 @@ mod slp_tests {
 
         let err = match tx_err.clone() {
             TransactionErr::TxRecoverable(_tx, err) => err,
-            TransactionErr::Plain(err) => err,
-            TransactionErr::NftProtocolNotSupported(err) => err,
+            TransactionErr::Plain(err) | TransactionErr::ProtocolNotSupported(err) => err,
         };
 
         println!("{:?}", err);
