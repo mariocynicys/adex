@@ -104,7 +104,6 @@ pub struct UnsignedTransactionInput {
     pub prev_script: Script,
     pub sequence: u32,
     pub amount: u64,
-    pub witness: Vec<Vec<u8>>,
 }
 
 /// Used for resigning and loading test transactions
@@ -115,7 +114,6 @@ impl From<TransactionInput> for UnsignedTransactionInput {
             prev_script: Vec::new().into(),
             sequence: i.sequence,
             amount: 0,
-            witness: i.script_witness.into_iter().map(Vec::from).collect(),
         }
     }
 }
@@ -666,7 +664,6 @@ mod tests {
             },
             prev_script: Vec::new().into(),
             amount: 0,
-            witness: vec![Vec::new()],
         };
 
         let output = TransactionOutput {
@@ -719,7 +716,6 @@ mod tests {
             },
             prev_script: Vec::new().into(),
             amount: 100,
-            witness: vec![Vec::new()],
         };
 
         let output = TransactionOutput {

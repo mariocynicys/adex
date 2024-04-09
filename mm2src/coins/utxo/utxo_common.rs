@@ -838,7 +838,6 @@ impl<'a, T: AsRef<UtxoCoinFields> + UtxoTxGenerationOps> UtxoTxBuilder<'a, T> {
                 prev_script: input.script,
                 sequence: SEQUENCE_FINAL,
                 amount: input.value,
-                witness: Vec::new(),
             }));
         self
     }
@@ -1008,7 +1007,6 @@ impl<'a, T: AsRef<UtxoCoinFields> + UtxoTxGenerationOps> UtxoTxBuilder<'a, T> {
                 prev_script: utxo.script,
                 sequence: SEQUENCE_FINAL,
                 amount: utxo.value,
-                witness: vec![],
             });
             self.sum_inputs += utxo.value;
 
@@ -1098,7 +1096,6 @@ impl<'a, T: AsRef<UtxoCoinFields> + UtxoTxGenerationOps> UtxoTxBuilder<'a, T> {
                     prev_script: utxo.script,
                     sequence: SEQUENCE_FINAL,
                     amount: utxo.value,
-                    witness: vec![],
                 });
             }
         }
@@ -1239,7 +1236,6 @@ async fn p2sh_spending_tx_preimage<T: UtxoCommonOps>(
             },
             prev_script: Vec::new().into(),
             amount,
-            witness: Vec::new(),
         }],
         outputs,
         expiry_height: 0,
