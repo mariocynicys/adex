@@ -2231,7 +2231,7 @@ impl UtxoRpcClientOps for ElectrumClient {
         let fut = async move {
             let hashes = output_scripts
                 .iter()
-                .map(|s| hex::encode(electrum_script_hash(&s)))
+                .map(|s| hex::encode(electrum_script_hash(s)))
                 .collect();
             let unspents = this.scripthash_list_unspent_batch(hashes).compat().await?;
 
@@ -2260,7 +2260,7 @@ impl UtxoRpcClientOps for ElectrumClient {
         let fut = async move {
             let hashes = output_scripts
                 .iter()
-                .map(|s| hex::encode(electrum_script_hash(&s)))
+                .map(|s| hex::encode(electrum_script_hash(s)))
                 .collect();
             let unspents = this.scripthash_list_unspent_batch(hashes).compat().await?;
 

@@ -2088,7 +2088,7 @@ fn test_native_client_unspents_filtered_using_tx_cache_single_tx_in_cache() {
             outpoint: tx.inputs[1].previous_output,
             value: 88843,
             height: Some(642293),
-            script: output_script.clone(),
+            script: output_script,
         },
     ];
 
@@ -2179,7 +2179,7 @@ fn test_native_client_unspents_filtered_using_tx_cache_single_several_chained_tx
             outpoint: tx_2.inputs[1].previous_output,
             value: 888823,
             height: Some(642293),
-            script: output_script.clone(),
+            script: output_script,
         },
     ];
     block_on(coin.as_ref().recently_spent_outpoints.lock()).add_spent(
