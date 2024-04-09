@@ -3304,18 +3304,16 @@ fn test_withdraw_p2pk_balance() {
 
     UtxoStandardCoin::get_unspent_ordered_list.mock_safe(|coin, _| {
         let cache = block_on(coin.as_ref().recently_spent_outpoints.lock());
-        let unspents = vec![
-            UnspentInfo {
-                outpoint: OutPoint {
-                    hash: 1.into(),
-                    index: 0,
-                },
-                value: 1000000000,
-                height: Default::default(),
-                // Use a p2pk output script for this UTXO
-                script: output_script_p2pk(&coin.as_ref().derivation_method.unwrap_single_addr().pubkey().unwrap()),
+        let unspents = vec![UnspentInfo {
+            outpoint: OutPoint {
+                hash: 1.into(),
+                index: 0,
             },
-        ];
+            value: 1000000000,
+            height: Default::default(),
+            // Use a p2pk output script for this UTXO
+            script: output_script_p2pk(&coin.as_ref().derivation_method.unwrap_single_addr().pubkey().unwrap()),
+        }];
         MockResult::Return(Box::pin(futures::future::ok((unspents, cache))))
     });
 
