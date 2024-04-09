@@ -2212,6 +2212,56 @@ fn test_native_client_unspents_filtered_using_tx_cache_single_several_chained_tx
 }
 
 #[test]
+#[cfg(not(target_arch = "wasm32"))]
+fn test_native_client_unspents_p2pk_filtered_using_tx_cache_single_tx_in_cache() {
+    let client = native_client_for_test();
+    let coin = utxo_coin_for_test(UtxoRpcClientEnum::Native(client), None, false);
+
+    let address: Address = Address::from_legacyaddress("RWdLNGQ428ZmhbMs6sVi42KPUbiKYKhiLr", &KMD_PREFIXES).unwrap();
+    let output_script = coin.script_for_address(&address).unwrap();
+    block_on(coin.as_ref().recently_spent_outpoints.lock()).for_script_pubkey = output_script.into();
+
+    // https://morty.explorer.dexstats.info/tx/e5b6a8c98bc802cf764430d79f2a8fdb1373ecf8bb0fb07e9ffea559083e9ead
+    let tx: UtxoTx = "0400008085202f8902c828be61a42ca160a5cbf549b74cb3ac0a8011eb32924b61dd22cb8153dd0c9c000000004948304502210094e99bb9369d2b3c4f13b8ffd7c4abacbdb2b5ee06d9453b13c23d9a924e1b34022005e5939999537f8eb901b6a37fb0776d5f6196fc7a38b1ecc8b043e84ea420bb01ffffffff2ec39160776dc986b7619e07f077d719a3247e1c0ab2148213013a34d79fd56a000000006b483045022100909ec2d09276891d48765f101d6501ef0606af971309f86a814042421f420bc202200bc376f0186aeec215c4ad99d04d8e44354b6838044b26a6a195b36b86de2ed6012102b2e5b95daf6600d4b210ce5e0a9dae507df9c7b89618c4aea05045e5acc1e7eeffffffff01eceadcd4060000001976a914ea29e13cd4446800297a5883a48caddd6d12377688ac00000000becd09000000000000000000000000".into();
+    let spent_by_tx = vec![
+        UnspentInfo {
+            outpoint: tx.inputs[0].previous_output,
+            value: 100139000,
+            height: Some(642293),
+            script: "2103c9f7c3b8ff78beb991cf806a5c91561cfe68f530c9df2b1402e57621ecbcd6b0ac".into(),
+        },
+        UnspentInfo {
+            outpoint: tx.inputs[1].previous_output,
+            value: 29240917628,
+            height: Some(642293),
+            script: "76a914ea29e13cd4446800297a5883a48caddd6d12377688ac".into(),
+        },
+    ];
+
+    block_on(coin.as_ref().recently_spent_outpoints.lock()).add_spent(
+        spent_by_tx.clone(),
+        tx.hash(),
+        tx.outputs.clone(),
+    );
+    NativeClient::list_unspent
+        .mock_safe(move |_, _, _| MockResult::Return(Box::new(futures01::future::ok(spent_by_tx.clone()))));
+
+    let (unspents_ordered, _) = block_on(coin.get_unspent_ordered_list(&address)).unwrap();
+    // output 0 is spent to self so it must be returned
+    let expected_unspent = UnspentInfo {
+        outpoint: OutPoint {
+            hash: tx.hash(),
+            index: 0,
+        },
+        value: tx.outputs[0].value,
+        height: None,
+        // Should be the same as: Some(output_script.clone()),
+        script: tx.outputs[0].script_pubkey.clone().into(),
+    };
+    assert_eq!(vec![expected_unspent], unspents_ordered);
+}
+
+#[test]
 fn validate_address_res_format() {
     let btc_017_and_above_response = json!({
       "isvalid": true,
