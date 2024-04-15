@@ -71,7 +71,6 @@ cfg_native! {
     use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader, ReadBuf};
     use tokio::net::TcpStream;
     use tokio_rustls::{client::TlsStream, TlsConnector};
-    use tokio_rustls::webpki::DnsNameRef;
     use webpki_roots::TLS_SERVER_ROOTS;
 }
 
@@ -1467,6 +1466,14 @@ fn addr_to_socket_addr(input: &str) -> Result<SocketAddr, String> {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+fn server_name_from_domain(dns_name: &str) -> Result<ServerName, String> {
+    match ServerName::try_from(dns_name) {
+        Ok(dns_name) if matches!(dns_name, ServerName::DnsName(_)) => Ok(dns_name),
+        _ => ERR!("Couldn't parse DNS name from '{}'", dns_name),
+    }
+}
+
 /// Attempts to process the request (parse url, etc), build up the config and create new electrum connection
 /// The function takes `abortable_system` that will be used to spawn Electrum's related futures.
 #[cfg(not(target_arch = "wasm32"))]
@@ -1484,8 +1491,7 @@ pub fn spawn_electrum(
                 .host()
                 .ok_or(ERRL!("Couldn't retrieve host from addr {}", req.url))?;
 
-            // check the dns name
-            try_s!(DnsNameRef::try_from_ascii_str(host));
+            try_s!(server_name_from_domain(host));
 
             ElectrumConfig::SSL {
                 dns_name: host.into(),
@@ -2712,9 +2718,8 @@ async fn electrum_last_chunk_loop(last_chunk: Arc<AtomicU64>) {
 fn rustls_client_config(unsafe_conf: bool) -> Arc<ClientConfig> {
     let mut cert_store = RootCertStore::empty();
 
-    cert_store.add_server_trust_anchors(
+    cert_store.add_trust_anchors(
         TLS_SERVER_ROOTS
-            .0
             .iter()
             .map(|ta| OwnedTrustAnchor::from_subject_spki_name_constraints(ta.subject, ta.spki, ta.name_constraints)),
     );
@@ -2756,7 +2761,9 @@ async fn connect_loop<Spawner: SpawnFuture>(
             Timer::sleep(current_delay as f64).await;
         };
 
-        let socket_addr = try_loop!(addr_to_socket_addr(&addr), addr, delay);
+        let socket_addr = addr_to_socket_addr(&addr).map_err(|e| {
+            error!("{:?} error {:?}", addr, e);
+        })?;
 
         let connect_f = match config.clone() {
             ElectrumConfig::TCP => Either::Left(TcpStream::connect(&socket_addr).map_ok(ElectrumStream::Tcp)),
@@ -2769,14 +2776,15 @@ async fn connect_loop<Spawner: SpawnFuture>(
                 } else {
                     TlsConnector::from(SAFE_TLS_CONFIG.clone())
                 };
+                // The address should always be correct since we checked it beforehand in initializaiton.
+                let dns = server_name_from_domain(dns_name.as_str()).map_err(|e| {
+                    error!("{:?} error {:?}", addr, e);
+                })?;
 
-                Either::Right(TcpStream::connect(&socket_addr).and_then(move |stream| {
-                    // Can use `unwrap` cause `dns_name` is pre-checked.
-                    let dns = ServerName::try_from(dns_name.as_str())
-                        .map_err(|e| format!("{:?}", e))
-                        .unwrap();
-                    tls_connector.connect(dns, stream).map_ok(ElectrumStream::Tls)
-                }))
+                Either::Right(
+                    TcpStream::connect(&socket_addr)
+                        .and_then(move |stream| tls_connector.connect(dns, stream).map_ok(ElectrumStream::Tls)),
+                )
             },
         };
 
