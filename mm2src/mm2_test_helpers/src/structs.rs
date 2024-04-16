@@ -789,6 +789,7 @@ pub struct EnableEthWithTokensResponse {
     pub current_block: u64,
     pub eth_addresses_infos: HashMap<String, CoinAddressInfo<CoinBalance>>,
     pub erc20_addresses_infos: HashMap<String, CoinAddressInfo<TokenBalances>>,
+    pub nfts_infos: Json,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1066,4 +1067,11 @@ pub struct DisableCoinOrders {
 #[serde(deny_unknown_fields)]
 pub struct CoinsNeededForKickstartResponse {
     pub result: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(deny_unknown_fields)]
+pub struct ActiveSwapsResponse {
+    pub uuids: Vec<Uuid>,
+    pub statuses: Option<HashMap<Uuid, Json>>,
 }

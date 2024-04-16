@@ -58,12 +58,14 @@ use mm2_err_handle::prelude::*;
 #[path = "database.rs"]
 pub mod database;
 
+#[path = "heartbeat_event.rs"] pub mod heartbeat_event;
 #[path = "lp_dispatcher.rs"] pub mod lp_dispatcher;
 #[path = "lp_message_service.rs"] pub mod lp_message_service;
 #[path = "lp_network.rs"] pub mod lp_network;
 #[path = "lp_ordermatch.rs"] pub mod lp_ordermatch;
 #[path = "lp_stats.rs"] pub mod lp_stats;
 #[path = "lp_swap.rs"] pub mod lp_swap;
+#[path = "lp_wallet.rs"] pub mod lp_wallet;
 #[path = "rpc.rs"] pub mod rpc;
 
 pub const PASSWORD_MAXIMUM_CONSECUTIVE_CHARACTERS: usize = 3;

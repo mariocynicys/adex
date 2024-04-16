@@ -631,7 +631,8 @@ pub trait UtxoCoinBuilderCommonOps {
 
     #[cfg(not(target_arch = "wasm32"))]
     fn native_client(&self) -> UtxoCoinBuildResult<NativeClient> {
-        use base64::{encode_config as base64_encode, URL_SAFE};
+        use base64::engine::general_purpose::URL_SAFE;
+        use base64::Engine;
 
         let native_conf_path = self.confpath()?;
         let network = self.network()?;
@@ -654,7 +655,7 @@ pub trait UtxoCoinBuilderCommonOps {
         let client = Arc::new(NativeClientImpl {
             coin_ticker,
             uri: format!("http://127.0.0.1:{}", rpc_port),
-            auth: format!("Basic {}", base64_encode(&auth_str, URL_SAFE)),
+            auth: format!("Basic {}", URL_SAFE.encode(auth_str)),
             event_handlers,
             request_id: 0u64.into(),
             list_unspent_concurrent_map: ConcurrentRequestMap::new(),
@@ -769,16 +770,16 @@ pub trait UtxoCoinBuilderCommonOps {
             .ok_or_else(|| format!("avg_blocktime not specified in {} coin config", self.ticker()))
             .map_to_mm(UtxoCoinBuildError::ErrorCalculatingStartingHeight)?;
         let blocks_per_day = DAY_IN_SECONDS / avg_blocktime;
-        let current_time_s = now_sec();
+        let current_time_sec = now_sec();
 
-        if current_time_s < date_s {
+        if current_time_sec < date_s {
             return MmError::err(UtxoCoinBuildError::ErrorCalculatingStartingHeight(format!(
                 "{} sync date must be earlier then current date",
                 self.ticker()
             )));
         };
 
-        let secs_since_date = current_time_s - date_s;
+        let secs_since_date = current_time_sec - date_s;
         let days_since_date = (secs_since_date / DAY_IN_SECONDS) - 1;
         let blocks_to_sync = (days_since_date * blocks_per_day) + blocks_per_day;
 

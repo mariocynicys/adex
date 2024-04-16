@@ -10,8 +10,8 @@ use super::{z_coin_from_conf_and_params_with_z_key, z_mainnet_constants, Future,
             RefundPaymentArgs, SendPaymentArgs, SpendPaymentArgs, SwapOps, ValidateFeeArgs, ValidatePaymentError,
             ZTransaction};
 use crate::z_coin::{z_htlc::z_send_dex_fee, ZcoinActivationParams, ZcoinRpcMode};
-use crate::CoinProtocol;
 use crate::DexFee;
+use crate::{CoinProtocol, SwapTxTypeWithSecretHash};
 use mm2_number::MmNumber;
 
 #[test]
@@ -56,19 +56,21 @@ fn zombie_coin_send_and_refund_maker_payment() {
         wait_for_confirmation_until: 0,
     };
     let tx = coin.send_maker_payment(args).wait().unwrap();
-    println!("swap tx {}", hex::encode(tx.tx_hash().0));
+    log!("swap tx {}", hex::encode(tx.tx_hash().0));
 
     let refund_args = RefundPaymentArgs {
         payment_tx: &tx.tx_hex(),
         time_lock,
         other_pubkey: taker_pub,
-        secret_hash: &secret_hash,
+        tx_type_with_secret_hash: SwapTxTypeWithSecretHash::TakerOrMakerPayment {
+            maker_secret_hash: &secret_hash,
+        },
         swap_contract_address: &None,
         swap_unique_data: pk_data.as_slice(),
         watcher_reward: false,
     };
     let refund_tx = block_on(coin.send_maker_refunds_payment(refund_args)).unwrap();
-    println!("refund tx {}", hex::encode(refund_tx.tx_hash().0));
+    log!("refund tx {}", hex::encode(refund_tx.tx_hash().0));
 }
 
 #[test]
@@ -115,7 +117,7 @@ fn zombie_coin_send_and_spend_maker_payment() {
     };
 
     let tx = coin.send_maker_payment(maker_payment_args).wait().unwrap();
-    println!("swap tx {}", hex::encode(tx.tx_hash().0));
+    log!("swap tx {}", hex::encode(tx.tx_hash().0));
 
     let maker_pub = taker_pub;
 
@@ -133,7 +135,7 @@ fn zombie_coin_send_and_spend_maker_payment() {
         .send_taker_spends_maker_payment(spends_payment_args)
         .wait()
         .unwrap();
-    println!("spend tx {}", hex::encode(spend_tx.tx_hash().0));
+    log!("spend tx {}", hex::encode(spend_tx.tx_hash().0));
 }
 
 #[test]
@@ -162,7 +164,7 @@ fn zombie_coin_send_dex_fee() {
     .unwrap();
 
     let tx = block_on(z_send_dex_fee(&coin, "0.01".parse().unwrap(), &[1; 16])).unwrap();
-    println!("dex fee tx {}", tx.txid());
+    log!("dex fee tx {}", tx.txid());
 }
 
 #[test]

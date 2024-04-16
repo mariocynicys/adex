@@ -2,12 +2,12 @@ use crate::eth::GetEthAddressError;
 #[cfg(target_arch = "wasm32")]
 use crate::nft::storage::wasm::WasmNftCacheError;
 use crate::nft::storage::NftStorageError;
-use crate::{CoinFindError, GetMyAddressError, WithdrawError};
+use crate::{CoinFindError, GetMyAddressError, NumConversError, WithdrawError};
 use common::{HttpStatusCode, ParseRfc3339Err};
 #[cfg(not(target_arch = "wasm32"))]
 use db_common::sqlite::rusqlite::Error as SqlError;
 use derive_more::Display;
-use enum_from::EnumFromStringify;
+use enum_derives::EnumFromStringify;
 use http::StatusCode;
 use mm2_net::transport::{GetInfoFromUriError, SlurpError};
 use serde::{Deserialize, Serialize};
@@ -36,6 +36,7 @@ pub enum GetNftInfoError {
         token_address: String,
         token_id: String,
     },
+    #[from_stringify("LockDBError")]
     #[display(fmt = "DB error {}", _0)]
     DbError(String),
     ParseRfc3339Err(ParseRfc3339Err),
@@ -43,6 +44,8 @@ pub enum GetNftInfoError {
     ContractTypeIsNull,
     ProtectFromSpamError(ProtectFromSpamError),
     TransferConfirmationsError(TransferConfirmationsError),
+    #[from_stringify("NumConversError")]
+    NumConversError(String),
 }
 
 impl From<GetNftInfoError> for WithdrawError {
@@ -101,18 +104,24 @@ impl From<ProtectFromSpamError> for GetNftInfoError {
     fn from(e: ProtectFromSpamError) -> Self { GetNftInfoError::ProtectFromSpamError(e) }
 }
 
-impl From<LockDBError> for GetNftInfoError {
-    fn from(e: LockDBError) -> Self { GetNftInfoError::DbError(e.to_string()) }
-}
-
 impl From<TransferConfirmationsError> for GetNftInfoError {
     fn from(e: TransferConfirmationsError) -> Self { GetNftInfoError::TransferConfirmationsError(e) }
+}
+
+impl From<ethabi::Error> for GetNftInfoError {
+    fn from(e: ethabi::Error) -> Self {
+        // Currently, we use the `ethabi` crate to work with a smart contract ABI known at compile time.
+        // It's an internal error if there are any issues during working with a smart contract ABI.
+        GetNftInfoError::Internal(e.to_string())
+    }
 }
 
 impl HttpStatusCode for GetNftInfoError {
     fn status_code(&self) -> StatusCode {
         match self {
-            GetNftInfoError::InvalidRequest(_) => StatusCode::BAD_REQUEST,
+            GetNftInfoError::InvalidRequest(_) | GetNftInfoError::TransferConfirmationsError(_) => {
+                StatusCode::BAD_REQUEST
+            },
             GetNftInfoError::InvalidResponse(_) | GetNftInfoError::ParseRfc3339Err(_) => StatusCode::FAILED_DEPENDENCY,
             GetNftInfoError::ContractTypeIsNull => StatusCode::NOT_FOUND,
             GetNftInfoError::Transport(_)
@@ -121,7 +130,7 @@ impl HttpStatusCode for GetNftInfoError {
             | GetNftInfoError::TokenNotFoundInWallet { .. }
             | GetNftInfoError::DbError(_)
             | GetNftInfoError::ProtectFromSpamError(_)
-            | GetNftInfoError::TransferConfirmationsError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            | GetNftInfoError::NumConversError(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 }
@@ -139,6 +148,7 @@ impl HttpStatusCode for GetNftInfoError {
 #[derive(Clone, Debug, Deserialize, Display, EnumFromStringify, PartialEq, Serialize, SerializeErrorType)]
 #[serde(tag = "error_type", content = "error_data")]
 pub enum UpdateNftError {
+    #[from_stringify("LockDBError")]
     #[display(fmt = "DB error {}", _0)]
     DbError(String),
     #[display(fmt = "Internal: {}", _0)]
@@ -224,10 +234,6 @@ impl From<ProtectFromSpamError> for UpdateNftError {
     fn from(e: ProtectFromSpamError) -> Self { UpdateNftError::ProtectFromSpamError(e) }
 }
 
-impl From<LockDBError> for UpdateNftError {
-    fn from(e: LockDBError) -> Self { UpdateNftError::DbError(e.to_string()) }
-}
-
 impl From<CoinFindError> for UpdateNftError {
     fn from(e: CoinFindError) -> Self {
         match e {
@@ -260,13 +266,12 @@ impl HttpStatusCode for UpdateNftError {
 }
 
 /// Enumerates the errors that can occur during spam protection operations.
-///
-/// This includes issues such as regex failures during text validation and
-/// serialization/deserialization problems.
 #[derive(Clone, Debug, Deserialize, Display, EnumFromStringify, PartialEq, Serialize)]
 pub enum ProtectFromSpamError {
+    /// Error related to regular expression operations.
     #[from_stringify("regex::Error")]
     RegexError(String),
+    /// Error related to serialization or deserialization with serde_json.
     #[from_stringify("serde_json::Error")]
     SerdeError(String),
 }
@@ -315,7 +320,7 @@ impl<T: NftStorageError> From<T> for UpdateSpamPhishingError {
 /// Errors encountered when parsing a `Chain` from a string.
 #[derive(Debug, Display)]
 pub enum ParseChainTypeError {
-    /// The provided string does not correspond to any of the supported blockchain types.
+    #[display(fmt = "The provided string does not correspond to any of the supported blockchain types.")]
     UnsupportedChainType,
 }
 
@@ -331,10 +336,13 @@ impl From<GetInfoFromUriError> for MetaFromUrlError {
     fn from(e: GetInfoFromUriError) -> Self { MetaFromUrlError::GetInfoFromUriError(e) }
 }
 
+/// Represents errors that can occur while locking the NFT database.
 #[derive(Debug, Display)]
 pub enum LockDBError {
+    /// Errors specific to the WebAssembly (WASM) environment's NFT cache.
     #[cfg(target_arch = "wasm32")]
     WasmNftCacheError(WasmNftCacheError),
+    /// Errors related to SQL operations in non-WASM environments.
     #[cfg(not(target_arch = "wasm32"))]
     SqlError(SqlError),
 }
@@ -349,12 +357,16 @@ impl From<WasmNftCacheError> for LockDBError {
     fn from(e: WasmNftCacheError) -> Self { LockDBError::WasmNftCacheError(e) }
 }
 
+/// Errors related to calculating transfer confirmations for NFTs.
 #[derive(Clone, Debug, Deserialize, Display, PartialEq, Serialize)]
 pub enum TransferConfirmationsError {
+    /// Occurs when the specified coin does not exist.
     #[display(fmt = "No such coin {}", coin)]
     NoSuchCoin { coin: String },
+    /// Triggered when the specified coin does not support NFT operations.
     #[display(fmt = "{} coin doesn't support NFT", coin)]
     CoinDoesntSupportNft { coin: String },
+    /// Represents errors encountered while retrieving the current block number.
     #[display(fmt = "Get current block error: {}", _0)]
     GetCurrentBlockErr(String),
 }
@@ -365,4 +377,40 @@ impl From<CoinFindError> for TransferConfirmationsError {
             CoinFindError::NoSuchCoin { coin } => TransferConfirmationsError::NoSuchCoin { coin },
         }
     }
+}
+
+/// Enumerates errors that can occur while clearing NFT data from the database.
+#[derive(Clone, Debug, Deserialize, Display, EnumFromStringify, PartialEq, Serialize, SerializeErrorType)]
+#[serde(tag = "error_type", content = "error_data")]
+pub enum ClearNftDbError {
+    /// Represents errors related to database operations.
+    #[from_stringify("LockDBError")]
+    #[display(fmt = "DB error {}", _0)]
+    DbError(String),
+    /// Indicates internal errors not directly associated with database operations.
+    #[display(fmt = "Internal: {}", _0)]
+    Internal(String),
+    /// Used for various types of invalid requests, such as missing or contradictory parameters.
+    #[display(fmt = "Invalid request: {}", _0)]
+    InvalidRequest(String),
+}
+
+impl<T: NftStorageError> From<T> for ClearNftDbError {
+    fn from(err: T) -> Self { ClearNftDbError::DbError(format!("{:?}", err)) }
+}
+
+impl HttpStatusCode for ClearNftDbError {
+    fn status_code(&self) -> StatusCode {
+        match self {
+            ClearNftDbError::InvalidRequest(_) => StatusCode::BAD_REQUEST,
+            ClearNftDbError::DbError(_) | ClearNftDbError::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        }
+    }
+}
+
+/// An error type for issues encountered while parsing contract type.
+#[derive(Debug, Display)]
+pub enum ParseContractTypeError {
+    /// Indicates that the contract type being parsed is not supported or recognized.
+    UnsupportedContractType,
 }

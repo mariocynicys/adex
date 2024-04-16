@@ -27,10 +27,11 @@ use crate::utxo::utxo_common_tests::TEST_COIN_DECIMALS;
 use crate::utxo::utxo_common_tests::{self, utxo_coin_fields_for_test, utxo_coin_from_fields, TEST_COIN_NAME};
 use crate::utxo::utxo_standard::{utxo_standard_coin_with_priv_key, UtxoStandardCoin};
 use crate::utxo::utxo_tx_history_v2::{UtxoTxDetailsParams, UtxoTxHistoryOps};
-#[cfg(not(target_arch = "wasm32"))] use crate::WithdrawFee;
 use crate::{BlockHeightAndTime, CoinBalance, ConfirmPaymentInput, DexFee, IguanaPrivKey, PrivKeyBuildPolicy,
             SearchForSwapTxSpendInput, SpendPaymentArgs, StakingInfosDetails, SwapOps, TradePreimageValue,
-            TxFeeDetails, TxMarshalingErr, ValidateFeeArgs, WaitForHTLCTxSpendArgs, INVALID_SENDER_ERR_LOG};
+            TxFeeDetails, TxMarshalingErr, ValidateFeeArgs, INVALID_SENDER_ERR_LOG};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::{WaitForHTLCTxSpendArgs, WithdrawFee};
 use chain::{BlockHeader, BlockHeaderBits, OutPoint};
 use common::executor::Timer;
 use common::{block_on, wait_until_sec, OrdRange, PagingOptionsEnum, DEX_FEE_ADDR_RAW_PUBKEY};
@@ -45,7 +46,7 @@ use mm2_core::mm_ctx::MmCtxBuilder;
 use mm2_number::bigdecimal::{BigDecimal, Signed};
 use mm2_test_helpers::electrums::doc_electrums;
 use mm2_test_helpers::for_tests::{electrum_servers_rpc, mm_ctx_with_custom_db, DOC_ELECTRUM_ADDRS,
-                                  MARTY_ELECTRUM_ADDRS, MORTY_ELECTRUM_ADDRS, RICK_ELECTRUM_ADDRS, T_BCH_ELECTRUMS};
+                                  MARTY_ELECTRUM_ADDRS, T_BCH_ELECTRUMS};
 use mocktopus::mocking::*;
 use rpc::v1::types::H256 as H256Json;
 use serialization::{deserialize, CoinVariant};
@@ -54,7 +55,6 @@ use spv_validation::storage::BlockHeaderStorageOps;
 use spv_validation::work::DifficultyAlgorithm;
 #[cfg(not(target_arch = "wasm32"))] use std::convert::TryFrom;
 use std::iter;
-use std::mem::discriminant;
 use std::num::NonZeroUsize;
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -159,7 +159,7 @@ fn test_extract_secret() {
 
 #[test]
 fn test_send_maker_spends_taker_payment_recoverable_tx() {
-    let client = electrum_client_for_test(RICK_ELECTRUM_ADDRS);
+    let client = electrum_client_for_test(DOC_ELECTRUM_ADDRS);
     let coin = utxo_coin_for_test(client.into(), None, false);
     let tx_hex = hex::decode("0100000001de7aa8d29524906b2b54ee2e0281f3607f75662cbc9080df81d1047b78e21dbc00000000d7473044022079b6c50820040b1fbbe9251ced32ab334d33830f6f8d0bf0a40c7f1336b67d5b0220142ccf723ddabb34e542ed65c395abc1fbf5b6c3e730396f15d25c49b668a1a401209da937e5609680cb30bff4a7661364ca1d1851c2506fa80c443f00a3d3bf7365004c6b6304f62b0e5cb175210270e75970bb20029b3879ec76c4acd320a8d0589e003636264d01a7d566504bfbac6782012088a9142fb610d856c19fd57f2d0cffe8dff689074b3d8a882103f368228456c940ac113e53dad5c104cf209f2f102a409207269383b6ab9b03deac68ffffffff01d0dc9800000000001976a9146d9d2b554d768232320587df75c4338ecc8bf37d88ac40280e5c").unwrap();
     let secret = hex::decode("9da937e5609680cb30bff4a7661364ca1d1851c2506fa80c443f00a3d3bf7365").unwrap();
@@ -176,15 +176,10 @@ fn test_send_maker_spends_taker_payment_recoverable_tx() {
     let tx_err = coin
         .send_maker_spends_taker_payment(maker_spends_payment_args)
         .wait()
-        .unwrap_err();
+        .expect_err("!send_maker_spends_taker_payment should error missing tx inputs");
 
-    let tx: UtxoTx = deserialize(tx_hex.as_slice()).unwrap();
-
-    // The error variant should equal to `TxRecoverable`
-    assert_eq!(
-        discriminant(&tx_err),
-        discriminant(&TransactionErr::TxRecoverable(TransactionEnum::from(tx), String::new()))
-    );
+    // The error variant should be `TxRecoverable`
+    assert!(matches!(tx_err, TransactionErr::TxRecoverable(_, _)));
 }
 
 #[test]
@@ -373,7 +368,7 @@ fn test_kmd_interest_kip_0001_reduction() {
 
     // Starting from dPoW 7th season, according to KIP0001 AUR should be reduced from 5% to 0.01%, i.e. div by 500
     let expected = value / 10512000 * (31 * 24 * 60 - 59) / 500;
-    println!("expected: {}", expected);
+    log!("expected: {}", expected);
     let actual = kmd_interest(height, value, lock_time, current_time).unwrap();
     assert_eq!(expected, actual);
 }
@@ -432,7 +427,7 @@ fn test_wait_for_payment_spend_timeout_native() {
     let client = NativeClientImpl::default();
 
     static mut OUTPUT_SPEND_CALLED: bool = false;
-    NativeClient::find_output_spend.mock_safe(|_, _, _, _, _| {
+    NativeClient::find_output_spend.mock_safe(|_, _, _, _, _, _| {
         unsafe { OUTPUT_SPEND_CALLED = true };
         MockResult::Return(Box::new(futures01::future::ok(None)))
     });
@@ -463,7 +458,7 @@ fn test_wait_for_payment_spend_timeout_native() {
 fn test_wait_for_payment_spend_timeout_electrum() {
     static mut OUTPUT_SPEND_CALLED: bool = false;
 
-    ElectrumClient::find_output_spend.mock_safe(|_, _, _, _, _| {
+    ElectrumClient::find_output_spend.mock_safe(|_, _, _, _, _, _| {
         unsafe { OUTPUT_SPEND_CALLED = true };
         MockResult::Return(Box::new(futures01::future::ok(None)))
     });
@@ -508,26 +503,26 @@ fn test_wait_for_payment_spend_timeout_electrum() {
 
 #[test]
 fn test_search_for_swap_tx_spend_electrum_was_spent() {
-    let secret = [0; 32];
-    let client = electrum_client_for_test(RICK_ELECTRUM_ADDRS);
+    let secret = hex::decode("a1c44607b870cd714a75d5243347fa36debcd3a91ff1f50b79f52d83238a0b2d").unwrap();
+    let client = electrum_client_for_test(DOC_ELECTRUM_ADDRS);
     let coin = utxo_coin_for_test(
         client.into(),
         Some("spice describe gravity federal blast come thank unfair canal monkey style afraid"),
         false,
     );
 
-    // raw tx bytes of https://rick.kmd.dev/tx/ba881ecca15b5d4593f14f25debbcdfe25f101fd2e9cf8d0b5d92d19813d4424
-    let payment_tx_bytes = hex::decode("0400008085202f8902e115acc1b9e26a82f8403c9f81785445cc1285093b63b6246cf45aabac5e0865000000006b483045022100ca578f2d6bae02f839f71619e2ced54538a18d7aa92bd95dcd86ac26479ec9f802206552b6c33b533dd6fc8985415a501ebec89d1f5c59d0c923d1de5280e9827858012102031d4256c4bc9f99ac88bf3dba21773132281f65f9bf23a59928bce08961e2f3ffffffffb0721bf69163f7a5033fb3d18ba5768621d8c1347ebaa2fddab0d1f63978ea78020000006b483045022100a3309f99167982e97644dbb5cd7279b86630b35fc34855e843f2c5c0cafdc66d02202a8c3257c44e832476b2e2a723dad1bb4ec1903519502a49b936c155cae382ee012102031d4256c4bc9f99ac88bf3dba21773132281f65f9bf23a59928bce08961e2f3ffffffff0300e1f5050000000017a91443fde927a77b3c1d104b78155dc389078c4571b0870000000000000000166a14b8bcb07f6344b42ab04250c86a6e8b75d3fdbbc64b8cd736000000001976a91405aab5342166f8594baf17a7d9bef5d56744332788acba0ce35e000000000000000000000000000000")
+    // raw tx bytes of https://doc.komodo.earth/tx/2f216f7ddb4350ed52e4c5b3a649da7aa63c932e623a1046066f91bdf00015a0
+    let payment_tx_bytes = hex::decode("0400008085202f890129f70bfc256e71600471be0a0e10f31d7025f350301e4c5aab71d4910bc29cb20200000069463043022027283d1a28ce25f3a937376f40873441a7b5f9c4a38c6637642b78845874f12b021f6cf1f4836724e186c5c299507e2c5db40855ed2c0acad73e3446a6f1e00d83012102031d4256c4bc9f99ac88bf3dba21773132281f65f9bf23a59928bce08961e2f3ffffffff0320a107000000000017a9148d3a47615c562a08ae3c42c237ca5a6f5f517b7a870000000000000000166a147c0c02ee06e3769376bb2b31e05a9e9965045ffbd2ae2b7b000000001976a91405aab5342166f8594baf17a7d9bef5d56744332788acf318fc65000000000000000000000000000000")
         .unwrap();
 
-    // raw tx bytes of https://rick.kmd.dev/tx/cea8028f93f7556ce0ef96f14b8b5d88ef2cd29f428df5936e02e71ca5b0c795
-    let spend_tx_bytes = hex::decode("0400008085202f890124443d81192dd9b5d0f89c2efd01f125fecdbbde254ff193455d5ba1cc1e88ba00000000d74730440220519d3eed69815a16357ff07bf453b227654dc85b27ffc22a77abe077302833ec02205c27f439ddc542d332504112871ecac310ea710b99e1922f48eb179c045e44ee01200000000000000000000000000000000000000000000000000000000000000000004c6b6304a9e5e25eb1752102031d4256c4bc9f99ac88bf3dba21773132281f65f9bf23a59928bce08961e2f3ac6782012088a914b8bcb07f6344b42ab04250c86a6e8b75d3fdbbc6882102031d4256c4bc9f99ac88bf3dba21773132281f65f9bf23a59928bce08961e2f3ac68ffffffff0118ddf505000000001976a91405aab5342166f8594baf17a7d9bef5d56744332788acbffee25e000000000000000000000000000000")
+    // raw tx bytes of https://doc.komodo.earth/tx/2450b60c8ab0d2498d9cee3cfb67ecbe08e335ec8fa20c7f95c474734d5e007a
+    let spend_tx_bytes = hex::decode("0400008085202f8901a01500f0bd916f0646103a622e933ca67ada49a6b3c5e452ed5043db7d6f212f00000000d7473044022042dbb34a97d9cdcea2c0db9871f3d1bbeb35ed74d373095eb76286573b121579022010bdee78e995f5b18f50a3ae82fac57db7147d90bedd9b96c42e54a1f65546540120a1c44607b870cd714a75d5243347fa36debcd3a91ff1f50b79f52d83238a0b2d004c6b6304df55fc65b1752102031d4256c4bc9f99ac88bf3dba21773132281f65f9bf23a59928bce08961e2f3ac6782012088a9147c0c02ee06e3769376bb2b31e05a9e9965045ffb882102d74dc5ec4c823f40dae5c563d7b22aab52c80f9f18226f47ea6d83107618df62ac68ffffffff01389d0700000000001976a914f26650dc9aa4e4505978ad635cdb15491cee70e188acdf55fc65000000000000000000000000000000")
         .unwrap();
     let spend_tx = TransactionEnum::UtxoTx(deserialize(spend_tx_bytes.as_slice()).unwrap());
 
     let search_input = SearchForSwapTxSpendInput {
-        time_lock: 1591928233,
-        other_pub: coin.my_public_key().unwrap(),
+        time_lock: 1711035871,
+        other_pub: &hex::decode("02d74dc5ec4c823f40dae5c563d7b22aab52c80f9f18226f47ea6d83107618df62").unwrap(),
         secret_hash: &*dhash160(&secret),
         tx: &payment_tx_bytes,
         search_from_block: 0,
@@ -543,26 +538,26 @@ fn test_search_for_swap_tx_spend_electrum_was_spent() {
 
 #[test]
 fn test_search_for_swap_tx_spend_electrum_was_refunded() {
-    let secret_hash = [0; 20];
-    let client = electrum_client_for_test(RICK_ELECTRUM_ADDRS);
+    let secret_hash = hex::decode("7a752434d4564c11b9333743122dab3a0aa21bd9").unwrap();
+    let client = electrum_client_for_test(DOC_ELECTRUM_ADDRS);
     let coin = utxo_coin_for_test(
         client.into(),
         Some("spice describe gravity federal blast come thank unfair canal monkey style afraid"),
         false,
     );
 
-    // raw tx bytes of https://rick.kmd.dev/tx/78ea7839f6d1b0dafda2ba7e34c1d8218676a58bd1b33f03a5f76391f61b72b0
-    let payment_tx_bytes = hex::decode("0400008085202f8902bf17bf7d1daace52e08f732a6b8771743ca4b1cb765a187e72fd091a0aabfd52000000006a47304402203eaaa3c4da101240f80f9c5e9de716a22b1ec6d66080de6a0cca32011cd77223022040d9082b6242d6acf9a1a8e658779e1c655d708379862f235e8ba7b8ca4e69c6012102031d4256c4bc9f99ac88bf3dba21773132281f65f9bf23a59928bce08961e2f3ffffffffff023ca13c0e9e085dd13f481f193e8a3e8fd609020936e98b5587342d994f4d020000006b483045022100c0ba56adb8de923975052312467347d83238bd8d480ce66e8b709a7997373994022048507bcac921fdb2302fa5224ce86e41b7efc1a2e20ae63aa738dfa99b7be826012102031d4256c4bc9f99ac88bf3dba21773132281f65f9bf23a59928bce08961e2f3ffffffff0300e1f5050000000017a9141ee6d4c38a3c078eab87ad1a5e4b00f21259b10d870000000000000000166a1400000000000000000000000000000000000000001b94d736000000001976a91405aab5342166f8594baf17a7d9bef5d56744332788ac2d08e35e000000000000000000000000000000")
+    // raw tx bytes of https://doc.komodo.earth/tx/ba08822b2da3f7120f5ad90cd999d5f0f4be4a63de496f4f76af202c68e4f5eb
+    let payment_tx_bytes = hex::decode("0400008085202f8901b2781d994b79be8e1f687a7f376109063bbe8b51ab36d04b35d4ff437b21d2a5010000006a47304402201832294ceb2b62a197bc2049218dcee69dcabb414249403efcc35ad65c17e73d0220348fbbb2b40880408bdef604e5a6cba34f514b84d5d6a9a4c4713669cd765fd2012102031d4256c4bc9f99ac88bf3dba21773132281f65f9bf23a59928bce08961e2f3ffffffff0320a107000000000017a91489dd2a32ae17a0575759581afb0002176296777b870000000000000000166a147a752434d4564c11b9333743122dab3a0aa21bd94af2de7a000000001976a91405aab5342166f8594baf17a7d9bef5d56744332788ac2b0efe65000000000000000000000000000000")
         .unwrap();
 
-    // raw tx bytes of https://rick.kmd.dev/tx/65085eacab5af46c24b6633b098512cc455478819f3c40f8826ae2b9c1ac15e1
-    let refund_tx_bytes = hex::decode("0400008085202f8901b0721bf69163f7a5033fb3d18ba5768621d8c1347ebaa2fddab0d1f63978ea7800000000b6473044022052e06c1abf639148229a3991fdc6da15fe51c97577f4fda351d9c606c7cf53670220780186132d67d354564cae710a77d94b6bb07dcbd7162a13bebee261ffc0963601514c6b63041dfae25eb1752102031d4256c4bc9f99ac88bf3dba21773132281f65f9bf23a59928bce08961e2f3ac6782012088a9140000000000000000000000000000000000000000882102031d4256c4bc9f99ac88bf3dba21773132281f65f9bf23a59928bce08961e2f3ac68feffffff0118ddf505000000001976a91405aab5342166f8594baf17a7d9bef5d56744332788ace6fae25e000000000000000000000000000000")
+    // raw tx bytes of https://doc.komodo.earth/tx/1b4e30f0e3101374464ec159c2f35b03412034fadee8c5769e8adcd5c91359bd
+    let refund_tx_bytes = hex::decode("0400008085202f8901ebf5e4682c20af764f6f49de634abef4f0d599d90cd95a0f12f7a32d2b8208ba00000000b647304402205bd140728b1b6de7b891025873d552a439c488dd7fe4234fd982eaa193e5776602205ad9fea8bc771d94de9d2fdc450186ea21f4fc81f28c2f2f75b5d2ad84891d8f01514c6b63049f0efe65b1752102031d4256c4bc9f99ac88bf3dba21773132281f65f9bf23a59928bce08961e2f3ac6782012088a9147a752434d4564c11b9333743122dab3a0aa21bd9882102d74dc5ec4c823f40dae5c563d7b22aab52c80f9f18226f47ea6d83107618df62ac68feffffff01389d0700000000001976a91405aab5342166f8594baf17a7d9bef5d56744332788acb80efe65000000000000000000000000000000")
         .unwrap();
     let refund_tx = TransactionEnum::UtxoTx(deserialize(refund_tx_bytes.as_slice()).unwrap());
 
     let search_input = SearchForSwapTxSpendInput {
-        time_lock: 1591933469,
-        other_pub: coin.as_ref().priv_key_policy.activated_key_or_err().unwrap().public(),
+        time_lock: 1711148703,
+        other_pub: &hex::decode("02d74dc5ec4c823f40dae5c563d7b22aab52c80f9f18226f47ea6d83107618df62").unwrap(),
         secret_hash: &secret_hash,
         tx: &payment_tx_bytes,
         search_from_block: 0,
@@ -1066,7 +1061,7 @@ fn test_electrum_rpc_client_error() {
 
     // use the static string instead because the actual error message cannot be obtain
     // by serde_json serialization
-    let expected = r#"JsonRpcError { client_info: "coin: RICK", request: JsonRpcRequest { jsonrpc: "2.0", id: "1", method: "blockchain.transaction.get", params: [String("0000000000000000000000000000000000000000000000000000000000000000"), Bool(true)] }, error: Response(electrum1.cipig.net:10060, Object({"code": Number(2), "message": String("daemon error: DaemonError({'code': -5, 'message': 'No such mempool or blockchain transaction. Use gettransaction for wallet transactions.'})")})) }"#;
+    let expected = r#"JsonRpcError { client_info: "coin: DOC", request: JsonRpcRequest { jsonrpc: "2.0", id: "1", method: "blockchain.transaction.get", params: [String("0000000000000000000000000000000000000000000000000000000000000000"), Bool(true)] }, error: Response(electrum1.cipig.net:10060, Object({"code": Number(2), "message": String("daemon error: DaemonError({'code': -5, 'message': 'No such mempool or blockchain transaction. Use gettransaction for wallet transactions.'})")})) }"#;
     let actual = format!("{}", err);
 
     assert!(actual.contains(expected));
@@ -2518,6 +2513,7 @@ fn test_find_output_spend_skips_conflicting_transactions() {
             &tx.outputs[vout].script_pubkey,
             vout,
             BlockHashOrHeight::Height(from_block),
+            TxHashAlgo::DSHA256,
         )
         .wait();
     assert_eq!(actual, Ok(None));
@@ -4445,7 +4441,7 @@ fn test_sign_verify_message_segwit() {
     );
 
     let is_valid = coin
-        .verify_message(&signature, message, "rck1qqk4t2dppvmu9jja0z7nan0h464n5gve8h7nhay")
+        .verify_message(&signature, message, "doc1qqk4t2dppvmu9jja0z7nan0h464n5gve8z592yd")
         .unwrap();
     assert!(is_valid);
 
@@ -4470,15 +4466,12 @@ fn test_tx_enum_from_bytes() {
     coin.tx_enum_from_bytes(&tx_hex).unwrap();
 
     let err = coin.tx_enum_from_bytes(&vec![0; 1000000]).unwrap_err().into_inner();
-    assert_eq!(
-        discriminant(&err),
-        discriminant(&TxMarshalingErr::CrossCheckFailed(String::new()))
-    );
+    assert!(matches!(err, TxMarshalingErr::CrossCheckFailed(_)));
 }
 
 #[test]
 fn test_hd_utxo_tx_history() {
-    let client = electrum_client_for_test(MORTY_ELECTRUM_ADDRS);
+    let client = electrum_client_for_test(DOC_ELECTRUM_ADDRS);
     block_on(utxo_common_tests::test_hd_utxo_tx_history_impl(client));
 }
 
@@ -4688,6 +4681,7 @@ fn test_spv_conf_with_verification() {
         .contains("max_stored_block_headers 2000 must be greater than retargeting interval"));
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn rick_blocker_5() -> BlockHeader {
     let header =
         "0400000028a4f1aa8be606c8bf8195b2e95d478a83314ff9ad7b017457d9e58d00d1710bb43f41db65677e3fdb83ddbd8cfb4a7ad2e110f74bc19726dc949576e003a1ecfbc2f4300c01f0b7820d00e3347c8da4ee614674376cbc45359daa54f9b5493e381b405d0f0f0f2001003cfb15008ad9f4fab1ff4076f8919f743193f007c0db28f5106e003b0000fd400500acba878991f600ed8c022758be9ff9752ef175e7530324df4d1b87f5a03ca5c2c3fce10b08743bd5ba03912703b8f305f7dd382487d437d9b1823cdc11a00f59a20b235ef57502a0a7ad6fc7d3d242e8f4477a01fb8834ac4dc6e2e40e4909f9edc0db07c0f98df40e5a61327311b005c98a727694ebaabcb366b92dda4af9e3f6e72c5461dd81d6daccbd1fca8ec17597df7585947b54deb83554859776b5bcefadfa566ff12c04ac624f9416e76beccec35694ae0ed11dc17a911f114225be62cf5b971628f364f57d8348d95fdc415b0d2a7a477ea130d3320108739edf761f85f81efd6c0e4eafa8166b05bd74af7928b0786b63ae499dba38065be13e7541b7f4e26727d0fa6887e265e09709b940ca87295ce5984de7d4058b5d340b162935fa46ee20cac955379e3c8fa1ff92fb354bb2a0fedf697b683a5875f4ed2bcef984d296b0c1e07a52920f1dd5a60140c7c1245a52ed196df3292db8bfff52923b0a8615b6a99a5fcf1e5f461f01a04b1c3bb517fe16553e1f8e8aa20bd3cc2cac6d3242a2ce373737b57cec4637907fd236e0d44d91d59533484ec23634b93645c10a858d83805d731f300aa27a162e172216d7fc21170b4d232767e4c66f9a871224f13480e89c2edb0e6e1ef5cf75d9203839cc0282fd7852319232057f30793bb5552d94ebf3ffcc67b73f44e80c3de79b9d8d7f0175939722054bc2ddfb84288dff8c7554f191d6ee1b65c40b75d4435712d4e88c64d6379ab7e578bcd8117501504faa7a3be3a6a2826fd7a3e5e9efb1d3642937f3a35be5793be8e1d4acf9dd2dcd356d6e4c7d0c8b87587b8ad901b9ce71792ae0bdae27811b52300e6809e4691bfc7f738252e7c197e228cce5fda6130f8f518e5059530b731fe8afbf51308aa8da3bd31b1d1eb22cca1a896aed281397925265cd861a7eadb80124363dec8cb508aea7c277f04b9841888dd932471349e651ce2622a59065932f463ffce6b19a975d6914336ab49394afd17dfb9a448157007ea1437b1483587bc7de0dec5103cafad76704e91e9ea2b0b9a8570b935d5c65478e7195b08161be4625b8d5fd3658e6164cf2d6898ecbf1f14945fdd75bb991a3d9ffac713a3a7a81a31a765b9c37a578976aa15e66c97c957f4651dc5fc492c2111d8724d375a8293a36e0ddcf2a01facf30401d8677611522882e1447e4c8be5fa9ad073fb3fdcc6f673981484089090fe4c05bfaae173503e0f99c7407b297852d216463924d365d26b4cd63401a46bd7ed969ddb235044eb2373645144976c7f713720c0238ade9d3aae1d2b153e82d093232d4b12b2108ec564ae0e855e09252f1434c28d90bb298ab6d1750498bf90d93c8797901911548b81af1ba185be52c0dff9c1b11812941d2d527c95c4382879298f364077710b5efd56d1bf39148aedc4fcd9e8bddb4c36a3f901dc11f9493d1fbdfe80c88fa8866c1465c939c0d71cb57e78822b5fc3023578aa2d6b9cd3ebaa54f22876b935f251183d8a68459cab30cd19bcb4e4c1e1a5a83e4687a4795dc23732e81b9f024f70db96e412831d26e61d4fa292a95648e0b614d9a148cd852df1bf26a34ea971e63f8c634133ab7b13ac8045f6d6e20af2313b38d12cb8cee54a7aba7a7cd7e8b1b5e0b0931d4665a0bb36b63f325161b571fdd4f159f470e443e9b0cfb193bf4eea5fa9715dc6132cb8ed97f7f097837471a5147d14f2066cd3dcd50460d70180a7a24e2b5b9ab20caf952d2ea1b51747afec975f76d0313a98e444f20938bf709530960f9fbf5af9857cbe3410d37f3cba10ff57642861586b7c1b1c57019602f1529df9d6e45ca2f7663519c58915e9e299d5beee73cb4553238566844f571374d3f6a247dd8ecbbc893";
@@ -4695,6 +4689,7 @@ fn rick_blocker_5() -> BlockHeader {
     BlockHeader::try_from_string_with_coin_variant(header.to_string(), "RICK".into()).unwrap()
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 #[test]
 fn test_block_header_utxo_loop_with_reorg() {
     use crate::utxo::utxo_builder::{block_header_utxo_loop, BlockHeaderUtxoLoopExtraArgs};
