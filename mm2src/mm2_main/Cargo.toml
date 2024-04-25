@@ -22,6 +22,7 @@ enable-solana = []
 default = []
 trezor-udp = ["crypto/trezor-udp"] # use for tests to connect to trezor emulator over udp
 run-device-tests = []
+enable-sia = []
 
 [dependencies]
 async-std = { version = "1.5", features = ["unstable"] }
