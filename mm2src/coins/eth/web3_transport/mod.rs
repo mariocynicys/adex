@@ -19,8 +19,9 @@ pub(crate) mod websocket_transport;
 
 pub(crate) type Web3SendOut = BoxFuture<'static, Result<Json, Error>>;
 
+/// The transport layer for interacting with a Web3 provider.
 #[derive(Clone, Debug)]
-pub(crate) enum Web3Transport {
+pub enum Web3Transport {
     Http(http_transport::HttpTransport),
     Websocket(websocket_transport::WebsocketTransport),
     #[cfg(target_arch = "wasm32")]

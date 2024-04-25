@@ -21,6 +21,7 @@ enable-sia = [
 ]
 default = []
 run-docker-tests = []
+for-tests = []
 
 [lib]
 name = "coins"

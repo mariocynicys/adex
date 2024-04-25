@@ -3,8 +3,8 @@ pub use mm2_number::MmNumber;
 use mm2_rpc::data::legacy::BalanceResponse;
 pub use mm2_test_helpers::for_tests::{check_my_swap_status, check_recent_swaps, enable_eth_coin, enable_native,
                                       enable_native_bch, erc20_dev_conf, eth_dev_conf, eth_sepolia_conf,
-                                      eth_testnet_conf, jst_sepolia_conf, mm_dump, wait_check_stats_swap_status,
-                                      MarketMakerIt, MAKER_ERROR_EVENTS, MAKER_SUCCESS_EVENTS, TAKER_ERROR_EVENTS,
+                                      jst_sepolia_conf, mm_dump, wait_check_stats_swap_status, MarketMakerIt,
+                                      MAKER_ERROR_EVENTS, MAKER_SUCCESS_EVENTS, TAKER_ERROR_EVENTS,
                                       TAKER_SUCCESS_EVENTS};
 
 use super::eth_docker_tests::{erc20_contract_checksum, fill_eth, fill_eth_erc20_with_private_key, geth_account,
@@ -27,6 +27,7 @@ use crypto::privkey::key_pair_from_seed;
 use crypto::Secp256k1Secret;
 use ethabi::Token;
 use ethereum_types::{H160 as H160Eth, U256};
+use futures::TryFutureExt;
 use futures01::Future;
 use http::StatusCode;
 use keys::{Address, AddressBuilder, AddressHashEnum, AddressPrefix, KeyPair, NetworkAddressPrefixes,
@@ -518,7 +519,7 @@ pub fn fill_qrc20_address(coin: &Qrc20Coin, amount: BigDecimal, timeout: u64) {
     };
 
     let from_addr = get_address_by_label(coin, QTUM_ADDRESS_LABEL);
-    let to_addr = coin.my_addr_as_contract_addr().unwrap();
+    let to_addr = coin.my_addr_as_contract_addr().compat().wait().unwrap();
     let satoshis = sat_from_big_decimal(&amount, coin.as_ref().decimals).expect("!sat_from_big_decimal");
 
     let hash = client
