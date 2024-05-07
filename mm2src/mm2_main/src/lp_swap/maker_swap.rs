@@ -2125,7 +2125,6 @@ pub async fn run_maker_swap(swap: RunMakerSwapInput, ctx: MmArc) {
                         )
                     }
 
-                    #[cfg(target_arch = "wasm32")]
                     if event.is_error() {
                         error!("[swap uuid={uuid_str}] {event:?}");
                     }

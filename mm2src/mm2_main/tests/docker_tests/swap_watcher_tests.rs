@@ -666,6 +666,55 @@ fn test_taker_completes_swap_after_restart() {
     block_on(mm_bob.stop()).unwrap();
 }
 
+// Verifies https://github.com/KomodoPlatform/komodo-defi-framework/issues/2111
+#[test]
+fn test_taker_completes_swap_after_taker_payment_spent_while_offline() {
+    let coins = json!([mycoin_conf(1000), mycoin1_conf(1000)]);
+    let mut mm_bob = run_maker_node(&coins, &[], &[]);
+    let (mut mm_alice, mut alice_conf) = run_taker_node(&coins, &[], &[&mm_bob.ip.to_string()]);
+
+    let uuids = block_on(start_swaps(
+        &mut mm_bob,
+        &mut mm_alice,
+        &[("MYCOIN1", "MYCOIN")],
+        25.,
+        25.,
+        2.,
+    ));
+
+    // stop taker after taker payment sent
+    block_on(mm_alice.wait_for_log(120., |log| log.contains("Taker payment tx"))).unwrap();
+    alice_conf.conf["dbdir"] = mm_alice.folder.join("DB").to_str().unwrap().into();
+    block_on(mm_alice.stop()).unwrap();
+
+    // wait for taker payment spent by maker
+    block_on(mm_bob.wait_for_log(120., |log| log.contains("Taker payment spend tx"))).unwrap();
+    // and restart taker
+    let mut mm_alice = block_on(MarketMakerIt::start_with_envs(
+        alice_conf.conf,
+        alice_conf.rpc_password.clone(),
+        None,
+        &[],
+    ))
+    .unwrap();
+
+    let (_alice_dump_log, _alice_dump_dashboard) = mm_alice.mm_dump();
+    log!("Alice log path: {}", mm_alice.log_path.display());
+    enable_coin(&mm_alice, "MYCOIN");
+    enable_coin(&mm_alice, "MYCOIN1");
+
+    block_on(wait_for_swaps_finish_and_check_status(
+        &mut mm_bob,
+        &mut mm_alice,
+        &uuids,
+        2.,
+        25.,
+    ));
+
+    block_on(mm_alice.stop()).unwrap();
+    block_on(mm_bob.stop()).unwrap();
+}
+
 #[test]
 fn test_watcher_spends_maker_payment_utxo_utxo() {
     let alice_privkey = hex::encode(random_secp256k1_secret());
