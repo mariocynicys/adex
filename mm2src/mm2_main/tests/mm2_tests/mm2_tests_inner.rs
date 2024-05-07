@@ -6253,6 +6253,9 @@ fn test_sign_raw_transaction_p2wpkh() {
 
     // start bob
     let mm_bob = MarketMakerIt::start(conf.conf, conf.rpc_password, None).unwrap();
+
+    let (_bob_dump_log, _bob_dump_dashboard) = mm_bob.mm_dump();
+    log!("Bob log path: {}", mm_bob.log_path.display());
     // Enable coins on Bob side. Print the replies in case we need the "address".
     let coin_init_resp = block_on(enable_electrum(&mm_bob, "tBTC-Segwit", false, TBTC_ELECTRUMS));
     assert_eq!(
@@ -6283,7 +6286,7 @@ fn test_sign_raw_transaction_p2wpkh() {
     // bad request: spend from two different addresses
     let response = block_on(test_sign_raw_transaction_rpc_helper(
         &mm_bob,
-        StatusCode::BAD_REQUEST,
+        StatusCode::INTERNAL_SERVER_ERROR,
         &json!({
             "coin": "tBTC-Segwit",
             "type": "UTXO",
@@ -6297,16 +6300,14 @@ fn test_sign_raw_transaction_p2wpkh() {
                 }, {
                     "tx_hash": "96c92f063da58f1f2defd14bf8f3780130c094ce3072133d83c6426ae7767c25",
                     "index": 0,
+                    // We don't own this address. Thus we will fail while signing this input.
                     "script_pub_key": "00146538caea0d5579f5b9f4e19ddbe2d6c663f3ea56",
                     "amount": 0.00002306,
                 }]
             }
         }),
     ));
-    assert_eq!(
-        response["error"],
-        Json::from("Invalid param: spends are from same address only")
-    );
+    assert!(response["error"].as_str().unwrap().contains("Signing error"));
 }
 
 #[cfg(all(feature = "run-device-tests", not(target_arch = "wasm32")))]
