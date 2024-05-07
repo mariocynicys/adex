@@ -1,7 +1,8 @@
 use super::{rpc::*, AllBalancesResult, TendermintCoin, TendermintCommons, TendermintToken};
 
 use crate::my_tx_history_v2::{CoinWithTxHistoryV2, MyTxHistoryErrorV2, MyTxHistoryTarget, TxHistoryStorage};
-use crate::tendermint::{CustomTendermintMsgType, TendermintFeeDetails};
+use crate::tendermint::htlc::CustomTendermintMsgType;
+use crate::tendermint::TendermintFeeDetails;
 use crate::tx_history_storage::{GetTxHistoryFilters, WalletId};
 use crate::utxo::utxo_common::big_decimal_from_sat_unsigned;
 use crate::{HistorySyncState, MarketCoinOps, MmCoin, TransactionDetails, TransactionType, TxFeeDetails};
@@ -260,7 +261,7 @@ where
 
             let ctx_balances = ctx.balances.clone();
 
-            let balances = match ctx.coin.all_balances().await {
+            let balances = match ctx.coin.get_all_balances().await {
                 Ok(balances) => balances,
                 Err(_) => {
                     return Self::change_state(OnIoErrorCooldown::new(self.address.clone(), self.last_height_state));
@@ -884,7 +885,7 @@ pub async fn tendermint_history_loop(
     _ctx: MmArc,
     _current_balance: Option<BigDecimal>,
 ) {
-    let balances = match coin.all_balances().await {
+    let balances = match coin.get_all_balances().await {
         Ok(balances) => balances,
         Err(e) => {
             log::error!("{}", e);
