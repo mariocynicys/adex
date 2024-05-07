@@ -768,6 +768,7 @@ impl<'a, T: AsRef<UtxoCoinFields> + UtxoTxGenerationOps> UtxoTxBuilder<'a, T> {
                 .find(|input| input.previous_output == utxo.outpoint)
             {
                 input.amount = utxo.value;
+                input.prev_script = utxo.script;
             } else {
                 self.tx.inputs.push(UnsignedTransactionInput {
                     previous_output: utxo.outpoint,
