@@ -13,7 +13,7 @@ use super::{broadcast_my_swap_status, broadcast_swap_message, broadcast_swap_msg
 use crate::mm2::lp_network::subscribe_to_topic;
 use crate::mm2::lp_ordermatch::TakerOrderBuilder;
 use crate::mm2::lp_swap::swap_v2_common::mark_swap_as_finished;
-use crate::mm2::lp_swap::taker_restart::get_command_based_on_watcher_activity;
+use crate::mm2::lp_swap::taker_restart::get_command_based_on_maker_or_watcher_activity;
 use crate::mm2::lp_swap::{broadcast_p2p_tx_msg, broadcast_swap_msg_every_delayed, tx_helper_topic,
                           wait_for_maker_payment_conf_duration, TakerSwapWatcherData, MAX_STARTED_AT_DIFF};
 use coins::lp_price::fetch_swap_coins_price;
@@ -471,7 +471,6 @@ pub async fn run_taker_swap(swap: RunTakerSwapInput, ctx: MmArc) {
                         )
                     }
 
-                    #[cfg(target_arch = "wasm32")]
                     if event.is_error() {
                         error!("[swap uuid={uuid}] {event:?}");
                     }
@@ -784,7 +783,7 @@ impl TakerSwap {
     #[inline]
     fn wait_refund_until(&self) -> u64 { self.r().data.taker_payment_lock + 3700 }
 
-    fn apply_event(&self, event: TakerSwapEvent) {
+    pub(crate) fn apply_event(&self, event: TakerSwapEvent) {
         match event {
             TakerSwapEvent::Started(data) => {
                 self.w().data = data;
@@ -1338,7 +1337,7 @@ impl TakerSwap {
         };
         drop(abort_send_handle);
 
-        let mut swap_events = vec![];
+        let mut swap_events = Vec::with_capacity(3);
         let instructions = match payload.instructions() {
             Some(instructions) => {
                 match self
@@ -2039,7 +2038,8 @@ impl TakerSwap {
             && maker_coin.is_supported_by_watchers()
             && saved.watcher_message_sent()
         {
-            command = get_command_based_on_watcher_activity(&ctx, &swap, saved, command).await?;
+            // discover events occurred while taker was offline, due to maker or watcher activity
+            command = get_command_based_on_maker_or_watcher_activity(&ctx, &swap, saved, command).await?;
         }
         drop_mutability!(command);
 

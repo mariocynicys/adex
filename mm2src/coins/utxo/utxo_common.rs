@@ -2702,7 +2702,7 @@ async fn get_unspents_for_inputs(
         .await
         .map_err(|err| RawTransactionError::InvalidParam(err.to_string()))?;
 
-    let mut unspents_loaded = vec![];
+    let mut unspents_loaded = Vec::with_capacity(inputs.len());
 
     for input in inputs {
         let prev_tx = prev_txns_loaded

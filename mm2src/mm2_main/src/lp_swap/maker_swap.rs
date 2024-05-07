@@ -711,7 +711,7 @@ impl MakerSwap {
         };
         drop(send_abort_handle);
 
-        let mut swap_events = vec![];
+        let mut swap_events = Vec::with_capacity(2);
         let instructions = match payload.instructions() {
             Some(instructions) => {
                 let maker_lock_duration =
@@ -2125,7 +2125,6 @@ pub async fn run_maker_swap(swap: RunMakerSwapInput, ctx: MmArc) {
                         )
                     }
 
-                    #[cfg(target_arch = "wasm32")]
                     if event.is_error() {
                         error!("[swap uuid={uuid_str}] {event:?}");
                     }
