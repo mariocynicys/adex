@@ -588,9 +588,9 @@ impl<'a, T: AsRef<UtxoCoinFields> + UtxoTxGenerationOps> UtxoTxBuilder<'a, T> {
                     }
                     if let Some(min_relay) = self.min_relay_fee {
                         if self.tx_fee < min_relay {
-                            outputs_plus_fee -= self.tx_fee;
-                            outputs_plus_fee += min_relay;
-                            self.tx_fee = min_relay;
+                            let fee_diff = min_relay - self.tx_fee;
+                            outputs_plus_fee += fee_diff;
+                            self.tx_fee += fee_diff;
                         }
                     }
                     self.sum_inputs >= outputs_plus_fee
@@ -680,6 +680,10 @@ impl<'a, T: AsRef<UtxoCoinFields> + UtxoTxGenerationOps> UtxoTxBuilder<'a, T> {
         };
 
         for utxo in self.available_inputs.clone() {
+            if self.update_fee_and_check_completeness(from.addr_format(), &actual_tx_fee) {
+                break;
+            }
+
             self.tx.inputs.push(UnsignedTransactionInput {
                 previous_output: utxo.outpoint,
                 prev_script: utxo.script,
@@ -687,10 +691,6 @@ impl<'a, T: AsRef<UtxoCoinFields> + UtxoTxGenerationOps> UtxoTxBuilder<'a, T> {
                 amount: utxo.value,
             });
             self.sum_inputs += utxo.value;
-
-            if self.update_fee_and_check_completeness(from.addr_format(), &actual_tx_fee) {
-                break;
-            }
         }
 
         match self.fee_policy {
