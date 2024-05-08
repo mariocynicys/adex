@@ -15,7 +15,7 @@ use mm2_test_helpers::for_tests::wait_check_stats_swap_status;
 use mm2_test_helpers::for_tests::{account_balance, btc_segwit_conf, btc_with_spv_conf, btc_with_sync_starting_header,
                                   check_recent_swaps, enable_qrc20, enable_utxo_v2_electrum, eth_dev_conf,
                                   find_metrics_in_json, from_env_file, get_new_address, get_shared_db_id, mm_spat,
-                                  morty_conf, rick_conf, sign_message, start_swaps, tbtc_segwit_conf,
+                                  morty_conf, my_balance, rick_conf, sign_message, start_swaps, tbtc_segwit_conf,
                                   tbtc_with_spv_conf, test_qrc20_history_impl, tqrc20_conf, verify_message,
                                   wait_for_swaps_finish_and_check_status, wait_till_history_has_records,
                                   MarketMakerIt, Mm2InitPrivKeyPolicy, Mm2TestConf, Mm2TestConfForSwap, RaiiDump,
@@ -258,74 +258,20 @@ fn test_my_balance() {
 fn test_p2pk_my_balance() {
     // PK of the P2PK balance: 03f8f8fa2062590ba9a0a7a86f937de22f540c015864aad35a2a9f6766de906265
     let seed = "salmon angle cushion sauce accuse earth volume until zone youth emerge favorite";
+    let coins = json!([tbtc_conf()]);
+    let conf = Mm2TestConf::seednode(seed, &coins);
+    let mm = MarketMakerIt::start(conf.conf, conf.rpc_password, None).unwrap();
 
-    let coins = json! ([
-        {
-            "coin": "tBTC",
-            "name": "tbitcoin",
-            "fname": "tBitcoin",
-            "rpcport": 18332,
-            "pubtype": 111,
-            "p2shtype": 196,
-            "wiftype": 239,
-            "txfee": 0,
-            "estimate_fee_mode": "ECONOMICAL",
-            "mm2": 1,
-            "required_confirmations": 0,
-            "protocol": {
-                "type": "UTXO"
-            },
-        }
-    ]);
-
-    let mm = MarketMakerIt::start(
-        json! ({
-            "gui": "nogui",
-            "netid": 9998,
-            "myipaddr": env::var("BOB_TRADE_IP").ok(),
-            "rpcip": env::var("BOB_TRADE_IP").ok(),
-            "passphrase": seed.to_string(),
-            "coins": coins,
-            "i_am_seed": true,
-            "rpc_password": "pass",
-        }),
-        "pass".into(),
-        None,
-    )
-    .unwrap();
     let (_dump_log, _dump_dashboard) = mm.mm_dump();
     log!("log path: {}", mm.log_path.display());
 
-    let electrum = block_on(mm.rpc(&json!({
-        "userpass": mm.userpass,
-        "method": "electrum",
-        "coin": "tBTC",
-        "servers": [{"url":"electrum1.cipig.net:10068"},{"url":"electrum2.cipig.net:10068"},{"url":"electrum3.cipig.net:10068"}],
-        "mm2": 1,
-    }))).unwrap();
-    assert_eq!(
-        electrum.0,
-        StatusCode::OK,
-        "RPC «electrum» failed with {} {}",
-        electrum.0,
-        electrum.1
-    );
+    block_on(enable_electrum(&mm, "tBTC", false, TBTC_ELECTRUMS));
+    let my_balance = block_on(my_balance(&mm, "tBTC"));
 
-    let my_balance = block_on(mm.rpc(&json! ({
-        "userpass": mm.userpass,
-        "method": "my_balance",
-        "coin": "tBTC",
-    })))
-    .unwrap();
-
-    let json: Json = json::from_str(&my_balance.1).unwrap();
-    let my_balance: &str = json["balance"].as_str().unwrap();
-    assert_eq!(my_balance, "0.00076");
-    let my_unspendable_balance = json["unspendable_balance"].as_str().unwrap();
-    assert_eq!(my_unspendable_balance, "0");
-    let my_address = json["address"].as_str().unwrap();
+    assert_eq!(my_balance.balance, "0.00076".parse().unwrap());
+    assert_eq!(my_balance.unspendable_balance, BigDecimal::from(0));
     // Even though the address is a P2PK, it's formatted as P2PKH like most explorers do.
-    assert_eq!(my_address, "mgrM9w49Q7vqtroLKGekLTqCVFye5u6G3v");
+    assert_eq!(my_balance.address, "mgrM9w49Q7vqtroLKGekLTqCVFye5u6G3v");
 }
 
 #[test]
