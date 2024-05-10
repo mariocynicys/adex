@@ -279,80 +279,20 @@ fn test_p2pk_my_balance() {
 #[cfg(not(target_arch = "wasm32"))]
 fn test_p2wpkh_my_balance() {
     let seed = "valley embody about obey never adapt gesture trust screen tube glide bread";
+    let coins = json!([tbtc_segwit_conf()]);
 
-    let coins = json! ([
-        {
-            "coin": "tBTC",
-            "name": "tbitcoin",
-            "fname": "tBitcoin",
-            "rpcport": 18332,
-            "pubtype": 111,
-            "p2shtype": 196,
-            "wiftype": 239,
-            "segwit": true,
-            "bech32_hrp": "tb",
-            "txfee": 0,
-            "estimate_fee_mode": "ECONOMICAL",
-            "mm2": 1,
-            "required_confirmations": 0,
-            "protocol": {
-                "type": "UTXO"
-            },
-            "address_format": {
-                "format":"segwit"
-            }
-        }
-    ]);
+    let conf = Mm2TestConf::seednode(seed, &coins);
+    let mm = MarketMakerIt::start(conf.conf, conf.rpc_password, None).unwrap();
 
-    let mm = MarketMakerIt::start(
-        json! ({
-            "gui": "nogui",
-            "netid": 9998,
-            "myipaddr": env::var ("BOB_TRADE_IP") .ok(),
-            "rpcip": env::var ("BOB_TRADE_IP") .ok(),
-            "passphrase": seed.to_string(),
-            "coins": coins,
-            "i_am_seed": true,
-            "rpc_password": "pass",
-        }),
-        "pass".into(),
-        None,
-    )
-    .unwrap();
     let (_dump_log, _dump_dashboard) = mm.mm_dump();
     log!("log path: {}", mm.log_path.display());
 
-    let electrum = block_on(mm.rpc(&json!({
-        "userpass": mm.userpass,
-        "method": "electrum",
-        "coin": "tBTC",
-        "servers": [{"url":"electrum1.cipig.net:10068"},{"url":"electrum2.cipig.net:10068"},{"url":"electrum3.cipig.net:10068"}],
-        "mm2": 1,
-        "address_format": {
-            "format": "segwit",
-        },
-    }))).unwrap();
-    assert_eq!(
-        electrum.0,
-        StatusCode::OK,
-        "RPC «electrum» failed with {} {}",
-        electrum.0,
-        electrum.1
-    );
+    block_on(enable_electrum(&mm, "tBTC", false, TBTC_ELECTRUMS));
+    let my_balance = block_on(my_balance(&mm, "tBTC"));
 
-    let my_balance = block_on(mm.rpc(&json! ({
-        "userpass": mm.userpass,
-        "method": "my_balance",
-        "coin": "tBTC",
-    })))
-    .unwrap();
-    let json: Json = json::from_str(&my_balance.1).unwrap();
-    let my_balance = json["balance"].as_str().unwrap();
-    assert_eq!(my_balance, "0.002");
-    let my_unspendable_balance = json["unspendable_balance"].as_str().unwrap();
-    assert_eq!(my_unspendable_balance, "0");
-    let my_address = json["address"].as_str().unwrap();
-    assert_eq!(my_address, "tb1qssfmay8nnghx7ynlznejnjxn6m4pemz9v7fsxy");
+    assert_eq!(my_balance.balance, "0.002".parse().unwrap());
+    assert_eq!(my_balance.unspendable_balance, "0".parse().unwrap());
+    assert_eq!(my_balance.address, "tb1qssfmay8nnghx7ynlznejnjxn6m4pemz9v7fsxy");
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -1149,68 +1089,19 @@ fn test_withdraw_and_send_hd() {
 #[cfg(not(target_arch = "wasm32"))]
 fn test_tbtc_withdraw_to_cashaddresses_should_fail() {
     let seed = "spice describe gravity federal blast come thank unfair canal monkey style afraid";
+    let coins = json!([tbtc_segwit_conf(),]);
 
-    let coins = json! ([
-        {
-            "coin": "tBTC",
-            "name": "tbitcoin",
-            "fname": "tBitcoin",
-            "rpcport": 18332,
-            "pubtype": 111,
-            "p2shtype": 196,
-            "wiftype": 239,
-            "segwit": true,
-            "bech32_hrp": "tb",
-            "txfee": 1000,
-            "mm2": 1,
-            "required_confirmations": 0,
-            "protocol": {
-                "type": "UTXO"
-            }
-        }
-    ]);
-
-    let mm_alice = MarketMakerIt::start(
-        json! ({
-            "gui": "nogui",
-            "netid": 8100,
-            "myipaddr": env::var ("ALICE_TRADE_IP") .ok(),
-            "rpcip": env::var ("ALICE_TRADE_IP") .ok(),
-            "passphrase": seed.to_string(),
-            "coins": coins,
-            "rpc_password": "password",
-            "i_am_seed": true,
-        }),
-        "password".into(),
-        None,
-    )
-    .unwrap();
+    let conf = Mm2TestConf::seednode(seed, &coins);
+    let mm_alice = MarketMakerIt::start(conf.conf, conf.rpc_password, None).unwrap();
 
     let (_alice_dump_log, _alice_dump_dashboard) = mm_alice.mm_dump();
     log!("Alice log path: {}", mm_alice.log_path.display());
 
-    // wait until RPC API is active
-
     // Enable coins. Print the replies in case we need the address.
-    let electrum = block_on(mm_alice.rpc(&json!({
-        "userpass": mm_alice.userpass,
-        "method": "electrum",
-        "coin": "tBTC",
-        "servers": [{"url":"electrum1.cipig.net:10068"},{"url":"electrum2.cipig.net:10068"},{"url":"electrum3.cipig.net:10068"}],
-        "mm2": 1,
-    }))).unwrap();
-    assert_eq!(
-        electrum.0,
-        StatusCode::OK,
-        "RPC «electrum» failed with {} {}",
-        electrum.0,
-        electrum.1
-    );
+    let electrum = block_on(enable_electrum(&mm_alice, "tBTC", false, TBTC_ELECTRUMS));
     log!("enable_coins (alice): {:?}", electrum);
-
-    let electrum_response: CoinInitResponse = json::from_str(&electrum.1).expect("Expected 'CoinInitResponse'");
     let mut enable_res = HashMap::new();
-    enable_res.insert("tBTC", electrum_response);
+    enable_res.insert("tBTC", electrum);
 
     // Send from BTC Legacy Address to Cashaddress should fail
     let withdraw = block_on(mm_alice.rpc(&json!({
@@ -1244,21 +1135,8 @@ fn test_withdraw_legacy() {
         {"coin":"MORTY_SEGWIT","asset":"MORTY_SEGWIT","txversion":4,"overwintered":1,"segwit":true,"txfee":1000,"protocol":{"type":"UTXO"}}
     ]);
 
-    let mm_alice = MarketMakerIt::start(
-        json!({
-            "gui": "nogui",
-            "netid": 8100,
-            "myipaddr": env::var ("ALICE_TRADE_IP") .ok(),
-            "rpcip": env::var ("ALICE_TRADE_IP") .ok(),
-            "passphrase": alice_passphrase,
-            "coins": coins,
-            "rpc_password": "password",
-            "i_am_seed": true,
-        }),
-        "password".into(),
-        None,
-    )
-    .unwrap();
+    let conf = Mm2TestConf::seednode(&alice_passphrase, &coins);
+    let mm_alice = MarketMakerIt::start(conf.conf, conf.rpc_password, None).unwrap();
 
     let (_alice_dump_log, _alice_dump_dashboard) = mm_alice.mm_dump();
     log!("Alice log path: {}", mm_alice.log_path.display());
@@ -1302,70 +1180,17 @@ fn test_withdraw_legacy() {
 #[cfg(not(target_arch = "wasm32"))]
 fn test_withdraw_segwit() {
     let seed = "spice describe gravity federal blast come thank unfair canal monkey style afraid";
+    let coins = json!([tbtc_segwit_conf()]);
 
-    let coins = json!([
-        {
-            "coin": "tBTC",
-            "name": "tbitcoin",
-            "fname": "tBitcoin",
-            "rpcport": 18332,
-            "pubtype": 111,
-            "p2shtype": 196,
-            "wiftype": 239,
-            "segwit": true,
-            "bech32_hrp": "tb",
-            "txfee": 0,
-            "estimate_fee_mode": "ECONOMICAL",
-            "mm2": 1,
-            "required_confirmations": 0,
-            "protocol": {
-                "type": "UTXO"
-            },
-            "address_format": {
-                "format":"segwit"
-            }
-        }
-    ]);
-
-    let mm_alice = MarketMakerIt::start(
-        json!({
-            "gui": "nogui",
-            "netid": 8100,
-            "myipaddr": env::var ("ALICE_TRADE_IP") .ok(),
-            "rpcip": env::var ("ALICE_TRADE_IP") .ok(),
-            "passphrase": seed.to_string(),
-            "coins": coins,
-            "rpc_password": "password",
-            "i_am_seed": true,
-        }),
-        "password".into(),
-        None,
-    )
-    .unwrap();
+    let conf = Mm2TestConf::seednode(seed, &coins);
+    let mm_alice = MarketMakerIt::start(conf.conf, conf.rpc_password, None).unwrap();
 
     let (_alice_dump_log, _alice_dump_dashboard) = mm_alice.mm_dump();
     log!("Alice log path: {}", mm_alice.log_path.display());
 
-    // wait until RPC API is active
-
     // Enable coins. Print the replies in case we need the address.
-    let electrum = block_on(mm_alice.rpc(&json!({
-        "userpass": mm_alice.userpass,
-        "method": "electrum",
-        "coin": "tBTC",
-        "servers": [{"url":"electrum1.cipig.net:10068"},{"url":"electrum2.cipig.net:10068"},{"url":"electrum3.cipig.net:10068"}],
-        "mm2": 1,
-        "address_format": {
-            "format": "segwit",
-        },
-    }))).unwrap();
-    assert_eq!(
-        electrum.0,
-        StatusCode::OK,
-        "RPC «electrum» failed with {} {}",
-        electrum.0,
-        electrum.1
-    );
+    let electrum = block_on(enable_electrum(&mm_alice, "tBTC", false, TBTC_ELECTRUMS));
+
     log!("enable_coins (alice): {:?}", electrum);
 
     let withdraw = block_on(mm_alice.rpc(&json!({
@@ -2731,49 +2556,16 @@ fn test_convert_utxo_address() {
 #[test]
 #[cfg(not(target_arch = "wasm32"))]
 fn test_convert_segwit_address() {
-    let coins = json! ([
-        {
-            "coin": "tBTC",
-            "name": "tbitcoin",
-            "fname": "tBitcoin",
-            "rpcport": 18332,
-            "pubtype": 111,
-            "p2shtype": 196,
-            "wiftype": 239,
-            "segwit": true,
-            "bech32_hrp": "tb",
-            "txfee": 1000,
-            "mm2": 1,
-            "required_confirmations": 0,
-            "protocol": {
-                "type": "UTXO"
-            }
-        }
-    ]);
+    let seed = "face pin block number add byte put seek mime test note password sin tab multiple";
+    let coins = json!([tbtc_segwit_conf(),]);
 
-    let mm = MarketMakerIt::start(
-        json! ({
-            "gui": "nogui",
-            "netid": 9998,
-            "myipaddr": env::var ("BOB_TRADE_IP") .ok(),
-            "rpcip": env::var ("BOB_TRADE_IP") .ok(),
-            "passphrase": "face pin block number add byte put seek mime test note password sin tab multiple",
-            "coins": coins,
-            "i_am_seed": true,
-            "rpc_password": "pass",
-        }),
-        "pass".into(),
-        None,
-    )
-    .unwrap();
+    let conf = Mm2TestConf::seednode(seed, &coins);
+    let mm = MarketMakerIt::start(conf.conf, conf.rpc_password, None).unwrap();
+
     let (_dump_log, _dump_dashboard) = mm.mm_dump();
     log!("log path: {}", mm.log_path.display());
 
-    let _electrum = block_on(enable_electrum(&mm, "tBTC", false, &[
-        "electrum1.cipig.net:10068",
-        "electrum2.cipig.net:10068",
-        "electrum3.cipig.net:10068",
-    ]));
+    let _electrum = block_on(enable_electrum(&mm, "tBTC", false, TBTC_ELECTRUMS));
 
     // test standard to segwit
     let rc = block_on(mm.rpc(&json! ({
@@ -3454,74 +3246,19 @@ fn test_validateaddress() {
 #[cfg(not(target_arch = "wasm32"))]
 fn test_validateaddress_segwit() {
     let seed = "spice describe gravity federal blast come thank unfair canal monkey style afraid";
+    let coins = json!([tbtc_segwit_conf(),]);
 
-    let coins = json! ([
-        {
-            "coin": "tBTC",
-            "name": "tbitcoin",
-            "fname": "tBitcoin",
-            "rpcport": 18332,
-            "pubtype": 111,
-            "p2shtype": 196,
-            "wiftype": 239,
-            "segwit": true,
-            "bech32_hrp": "tb",
-            "txfee": 1000,
-            "mm2": 1,
-            "required_confirmations": 0,
-            "protocol": {
-                "type": "UTXO"
-            },
-            "address_format": {
-                "format":"segwit"
-            }
-        }
-    ]);
-
-    let mm_alice = MarketMakerIt::start(
-        json! ({
-            "gui": "nogui",
-            "netid": 8100,
-            "myipaddr": env::var ("ALICE_TRADE_IP") .ok(),
-            "rpcip": env::var ("ALICE_TRADE_IP") .ok(),
-            "passphrase": seed.to_string(),
-            "coins": coins,
-            "rpc_password": "password",
-            "i_am_seed": true,
-        }),
-        "password".into(),
-        None,
-    )
-    .unwrap();
+    let conf = Mm2TestConf::seednode(seed, &coins);
+    let mm_alice = MarketMakerIt::start(conf.conf, conf.rpc_password, None).unwrap();
 
     let (_alice_dump_log, _alice_dump_dashboard) = mm_alice.mm_dump();
     log!("Alice log path: {}", mm_alice.log_path.display());
 
-    // wait until RPC API is active
-
     // Enable coins. Print the replies in case we need the address.
-    let electrum = block_on(mm_alice.rpc(&json!({
-        "userpass": mm_alice.userpass,
-        "method": "electrum",
-        "coin": "tBTC",
-        "servers": [{"url":"electrum1.cipig.net:10068"},{"url":"electrum2.cipig.net:10068"},{"url":"electrum3.cipig.net:10068"}],
-        "mm2": 1,
-        "address_format": {
-            "format": "segwit",
-        },
-    }))).unwrap();
-    assert_eq!(
-        electrum.0,
-        StatusCode::OK,
-        "RPC «electrum» failed with {} {}",
-        electrum.0,
-        electrum.1
-    );
+    let electrum = block_on(enable_electrum(&mm_alice, "tBTC", false, TBTC_ELECTRUMS));
     log!("enable_coins (alice): {:?}", electrum);
-
-    let electrum_response: CoinInitResponse = json::from_str(&electrum.1).expect("Expected 'CoinInitResponse'");
     let mut enable_res = HashMap::new();
-    enable_res.insert("tBTC", electrum_response);
+    enable_res.insert("tBTC", electrum);
 
     // test valid Segwit address
     let rc = block_on(mm_alice.rpc(&json! ({
@@ -3989,55 +3726,18 @@ fn test_qrc20_tx_history() { block_on(test_qrc20_history_impl(None)); }
 #[cfg(not(target_arch = "wasm32"))]
 fn test_tx_history_segwit() {
     let passphrase = "also shoot benefit prefer juice shell elder veteran woman mimic image kidney";
-    let coins = json!([
-        {"coin":"tBTC","name":"tbitcoin","fname":"tBitcoin","rpcport":18332,"pubtype":111,"p2shtype":196,"wiftype":239,"segwit":true,"bech32_hrp":"tb","txfee":0,"estimate_fee_mode":"ECONOMICAL","mm2":1,"required_confirmations":0,"protocol":{"type":"UTXO"},"address_format":{"format":"segwit"}},
-    ]);
+    let coins = json!([tbtc_segwit_conf(),]);
 
-    let mm = MarketMakerIt::start(
-        json! ({
-            "gui": "nogui",
-            "netid": 9998,
-            "myipaddr": env::var ("BOB_TRADE_IP") .ok(),
-            "rpcip": env::var ("BOB_TRADE_IP") .ok(),
-            "passphrase": passphrase,
-            "coins": coins,
-            "i_am_seed": true,
-            "rpc_password": "pass",
-            "metrics_interval": 30.,
-        }),
-        "pass".into(),
-        None,
-    )
-    .unwrap();
+    let conf = Mm2TestConf::seednode(passphrase, &coins);
+    let mm = MarketMakerIt::start(conf.conf, conf.rpc_password, None).unwrap();
+
     let (_dump_log, _dump_dashboard) = mm.mm_dump();
     log!("log path: {}", mm.log_path.display());
 
     // enable tBTC to see that to/from segwit addresses are displayed correctly in tx_history
     // and that tx_history is retrieved for the segwit address instead of legacy
-    let electrum = block_on(mm.rpc(&json!({
-        "userpass": mm.userpass,
-        "method": "electrum",
-        "coin": "tBTC",
-        "servers": [{"url":"electrum1.cipig.net:10068"},{"url":"electrum2.cipig.net:10068"},{"url":"electrum3.cipig.net:10068"}],
-        "mm2": 1,
-        "tx_history": true,
-        "address_format": {
-            "format": "segwit",
-        },
-    })))
-        .unwrap();
-    assert_eq!(
-        electrum.0,
-        StatusCode::OK,
-        "RPC «electrum» failed with status «{}», response «{}»",
-        electrum.0,
-        electrum.1
-    );
-    let electrum_json: Json = json::from_str(&electrum.1).unwrap();
-    assert_eq!(
-        electrum_json["address"].as_str(),
-        Some("tb1qdkwjk42dw6pryvs9sl0ht3pn3mxghuma64jst5")
-    );
+    let electrum = block_on(enable_electrum(&mm, "tBTC", false, TBTC_ELECTRUMS));
+    assert_eq!(&electrum.address, "tb1qdkwjk42dw6pryvs9sl0ht3pn3mxghuma64jst5");
 
     block_on(wait_till_history_has_records(&mm, "tBTC", 13));
 
@@ -4115,51 +3815,17 @@ fn test_tx_history_segwit() {
 #[cfg(not(target_arch = "wasm32"))]
 fn test_tx_history_tbtc_non_segwit() {
     let passphrase = "also shoot benefit prefer juice shell elder veteran woman mimic image kidney";
-    let coins = json!([
-        {"coin":"tBTC","name":"tbitcoin","fname":"tBitcoin","rpcport":18332,"pubtype":111,"p2shtype":196,"wiftype":239,"segwit":true,"bech32_hrp":"tb","txfee":0,"estimate_fee_mode":"ECONOMICAL","mm2":1,"required_confirmations":0,"protocol":{"type":"UTXO"}},
-    ]);
+    let coins = json!([tbtc_segwit_conf(),]);
 
-    let mm = MarketMakerIt::start(
-        json! ({
-            "gui": "nogui",
-            "netid": 9998,
-            "myipaddr": env::var ("BOB_TRADE_IP") .ok(),
-            "rpcip": env::var ("BOB_TRADE_IP") .ok(),
-            "passphrase": passphrase,
-            "coins": coins,
-            "i_am_seed": true,
-            "rpc_password": "pass",
-            "metrics_interval": 30.,
-        }),
-        "pass".into(),
-        None,
-    )
-    .unwrap();
+    let conf = Mm2TestConf::seednode(passphrase, &coins);
+    let mm = MarketMakerIt::start(conf.conf, conf.rpc_password, None).unwrap();
+
     let (_dump_log, _dump_dashboard) = mm.mm_dump();
     log!("log path: {}", mm.log_path.display());
 
     // enable tBTC in legacy first to see that to/from segwit addresses are displayed correctly in tx_history
-    let electrum = block_on(mm.rpc(&json!({
-        "userpass": mm.userpass,
-        "method": "electrum",
-        "coin": "tBTC",
-        "servers": [{"url":"electrum1.cipig.net:10068"},{"url":"electrum2.cipig.net:10068"},{"url":"electrum3.cipig.net:10068"}],
-        "mm2": 1,
-        "tx_history": true,
-    })))
-        .unwrap();
-    assert_eq!(
-        electrum.0,
-        StatusCode::OK,
-        "RPC «electrum» failed with status «{}», response «{}»",
-        electrum.0,
-        electrum.1
-    );
-    let electrum_json: Json = json::from_str(&electrum.1).unwrap();
-    assert_eq!(
-        electrum_json["address"].as_str(),
-        Some("mqWYEGxLeK843n3xMTe8EWTFPyoSZjtUXb")
-    );
+    let electrum = block_on(enable_electrum(&mm, "tBTC", false, TBTC_ELECTRUMS));
+    assert_eq!(&electrum.address, "mqWYEGxLeK843n3xMTe8EWTFPyoSZjtUXb");
 
     let expected = vec![
         // https://live.blockcypher.com/btc-testnet/tx/a41b2e5f0741d1dcbc309ce4c43fde1ad44c5e61bb34778ab0bf9f3d9fd6fb6c/
