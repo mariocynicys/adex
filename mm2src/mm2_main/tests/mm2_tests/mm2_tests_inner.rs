@@ -287,8 +287,8 @@ fn test_p2wpkh_my_balance() {
     let (_dump_log, _dump_dashboard) = mm.mm_dump();
     log!("log path: {}", mm.log_path.display());
 
-    block_on(enable_electrum(&mm, "tBTC", false, TBTC_ELECTRUMS));
-    let my_balance = block_on(my_balance(&mm, "tBTC"));
+    block_on(enable_electrum(&mm, "tBTC-Segwit", false, TBTC_ELECTRUMS));
+    let my_balance = block_on(my_balance(&mm, "tBTC-Segwit"));
 
     assert_eq!(my_balance.balance, "0.002".parse().unwrap());
     assert_eq!(my_balance.unspendable_balance, "0".parse().unwrap());
@@ -1098,16 +1098,14 @@ fn test_tbtc_withdraw_to_cashaddresses_should_fail() {
     log!("Alice log path: {}", mm_alice.log_path.display());
 
     // Enable coins. Print the replies in case we need the address.
-    let electrum = block_on(enable_electrum(&mm_alice, "tBTC", false, TBTC_ELECTRUMS));
+    let electrum = block_on(enable_electrum(&mm_alice, "tBTC-Segwit", false, TBTC_ELECTRUMS));
     log!("enable_coins (alice): {:?}", electrum);
-    let mut enable_res = HashMap::new();
-    enable_res.insert("tBTC", electrum);
 
     // Send from BTC Legacy Address to Cashaddress should fail
     let withdraw = block_on(mm_alice.rpc(&json!({
         "userpass": mm_alice.userpass,
         "method": "withdraw",
-        "coin": "tBTC",
+        "coin": "tBTC-Segwit",
         "to": "bchtest:qqgp9xh3435xamv7ghct8emer2s2erzj8gx3gnhwkq",
         "amount": 0.00001,
     })))
@@ -1189,14 +1187,14 @@ fn test_withdraw_segwit() {
     log!("Alice log path: {}", mm_alice.log_path.display());
 
     // Enable coins. Print the replies in case we need the address.
-    let electrum = block_on(enable_electrum(&mm_alice, "tBTC", false, TBTC_ELECTRUMS));
+    let electrum = block_on(enable_electrum(&mm_alice, "tBTC-Segwit", false, TBTC_ELECTRUMS));
 
     log!("enable_coins (alice): {:?}", electrum);
 
     let withdraw = block_on(mm_alice.rpc(&json!({
         "userpass": mm_alice.userpass,
         "method": "withdraw",
-        "coin": "tBTC",
+        "coin": "tBTC-Segwit",
         "to": "tb1qdkwjk42dw6pryvs9sl0ht3pn3mxghuma64jst5",
         "amount": 0.00001,
     })))
@@ -1209,7 +1207,7 @@ fn test_withdraw_segwit() {
     let withdraw = block_on(mm_alice.rpc(&json!({
         "userpass": mm_alice.userpass,
         "method": "withdraw",
-        "coin": "tBTC",
+        "coin": "tBTC-Segwit",
         "to": "ltc1qdkwjk42dw6pryvs9sl0ht3pn3mxghuma64jst5",
         "amount": 0.00001,
     })))
@@ -1231,7 +1229,7 @@ fn test_withdraw_segwit() {
     let withdraw = block_on(mm_alice.rpc(&json!({
         "userpass": mm_alice.userpass,
         "method": "withdraw",
-        "coin": "tBTC",
+        "coin": "tBTC-Segwit",
         "to": "tb1p6h5fuzmnvpdthf5shf0qqjzwy7wsqc5rhmgq2ks9xrak4ry6mtrscsqvzp",
         "amount": 0.00001,
     })))
@@ -2565,13 +2563,13 @@ fn test_convert_segwit_address() {
     let (_dump_log, _dump_dashboard) = mm.mm_dump();
     log!("log path: {}", mm.log_path.display());
 
-    let _electrum = block_on(enable_electrum(&mm, "tBTC", false, TBTC_ELECTRUMS));
+    let _electrum = block_on(enable_electrum(&mm, "tBTC-Segwit", false, TBTC_ELECTRUMS));
 
     // test standard to segwit
     let rc = block_on(mm.rpc(&json! ({
         "userpass": mm.userpass,
         "method": "convertaddress",
-        "coin": "tBTC",
+        "coin": "tBTC-Segwit",
         "from": "mqWYEGxLeK843n3xMTe8EWTFPyoSZjtUXb",
         "to_address_format":{"format":"segwit"},
     })))
@@ -2595,7 +2593,7 @@ fn test_convert_segwit_address() {
     let rc = block_on(mm.rpc(&json! ({
         "userpass": mm.userpass,
         "method": "convertaddress",
-        "coin": "tBTC",
+        "coin": "tBTC-Segwit",
         "from": "tb1qdkwjk42dw6pryvs9sl0ht3pn3mxghuma64jst5",
         "to_address_format":{"format":"standard"},
     })))
@@ -2619,7 +2617,7 @@ fn test_convert_segwit_address() {
     let rc = block_on(mm.rpc(&json! ({
         "userpass": mm.userpass,
         "method": "convertaddress",
-        "coin": "tBTC",
+        "coin": "tBTC-Segwit",
         "from": "1AzawDsMqHgoGfaLdtfkQbEvXzCjk5oyFx",
         "to_address_format":{"format":"segwit"},
     })))
@@ -2635,7 +2633,7 @@ fn test_convert_segwit_address() {
     let rc = block_on(mm.rpc(&json! ({
         "userpass": mm.userpass,
         "method": "convertaddress",
-        "coin": "tBTC",
+        "coin": "tBTC-Segwit",
         "from": "ltc1qdkwjk42dw6pryvs9sl0ht3pn3mxghuma64jst5",
         "to_address_format":{"format":"standard"},
     })))
@@ -3255,16 +3253,14 @@ fn test_validateaddress_segwit() {
     log!("Alice log path: {}", mm_alice.log_path.display());
 
     // Enable coins. Print the replies in case we need the address.
-    let electrum = block_on(enable_electrum(&mm_alice, "tBTC", false, TBTC_ELECTRUMS));
+    let electrum = block_on(enable_electrum(&mm_alice, "tBTC-Segwit", false, TBTC_ELECTRUMS));
     log!("enable_coins (alice): {:?}", electrum);
-    let mut enable_res = HashMap::new();
-    enable_res.insert("tBTC", electrum);
 
     // test valid Segwit address
     let rc = block_on(mm_alice.rpc(&json! ({
         "userpass": mm_alice.userpass,
         "method": "validateaddress",
-        "coin": "tBTC",
+        "coin": "tBTC-Segwit",
         "address": "tb1qdkwjk42dw6pryvs9sl0ht3pn3mxghuma64jst5",
     })))
     .unwrap();
@@ -3287,7 +3283,7 @@ fn test_validateaddress_segwit() {
     let rc = block_on(mm_alice.rpc(&json! ({
         "userpass": mm_alice.userpass,
         "method": "validateaddress",
-        "coin": "tBTC",
+        "coin": "tBTC-Segwit",
         "address": "bc1qdkwjk42dw6pryvs9sl0ht3pn3mxghuma64jst5",
     })))
     .unwrap();
@@ -3736,7 +3732,7 @@ fn test_tx_history_segwit() {
 
     // enable tBTC to see that to/from segwit addresses are displayed correctly in tx_history
     // and that tx_history is retrieved for the segwit address instead of legacy
-    let electrum = block_on(enable_electrum(&mm, "tBTC", false, TBTC_ELECTRUMS));
+    let electrum = block_on(enable_electrum(&mm, "tBTC-Segwit", false, TBTC_ELECTRUMS));
     assert_eq!(&electrum.address, "tb1qdkwjk42dw6pryvs9sl0ht3pn3mxghuma64jst5");
 
     block_on(wait_till_history_has_records(&mm, "tBTC", 13));
@@ -3744,7 +3740,7 @@ fn test_tx_history_segwit() {
     let tx_history = block_on(mm.rpc(&json!({
         "userpass": mm.userpass,
         "method": "my_tx_history",
-        "coin": "tBTC",
+        "coin": "tBTC-Segwit",
         "limit": 13,
     })))
     .unwrap();
@@ -3824,7 +3820,7 @@ fn test_tx_history_tbtc_non_segwit() {
     log!("log path: {}", mm.log_path.display());
 
     // enable tBTC in legacy first to see that to/from segwit addresses are displayed correctly in tx_history
-    let electrum = block_on(enable_electrum(&mm, "tBTC", false, TBTC_ELECTRUMS));
+    let electrum = block_on(enable_electrum(&mm, "tBTC-Segwit", false, TBTC_ELECTRUMS));
     assert_eq!(&electrum.address, "mqWYEGxLeK843n3xMTe8EWTFPyoSZjtUXb");
 
     let expected = vec![
@@ -3876,12 +3872,12 @@ fn test_tx_history_tbtc_non_segwit() {
         "649d514d76702a0925a917d830e407f4f1b52d78832520e486c140ce8d0b879f",
     ];
 
-    block_on(wait_till_history_has_records(&mm, "tBTC", expected.len()));
+    block_on(wait_till_history_has_records(&mm, "tBTC-Segwit", expected.len()));
 
     let tx_history = block_on(mm.rpc(&json!({
         "userpass": mm.userpass,
         "method": "my_tx_history",
-        "coin": "tBTC",
+        "coin": "tBTC-Segwit",
         "limit": 100,
     })))
     .unwrap();
